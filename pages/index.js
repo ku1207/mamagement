@@ -504,11 +504,17 @@ function UnauthorizedContent() {
 function DailyDataContent() {
   const { selectedAdvertiser } = useAuth()
   
+  // 당월 1일과 당일 계산
+  const today = new Date()
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  
   // 필터 상태 관리
   const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타'])
   const [keywordMetric, setKeywordMetric] = useState('광고비')
   const [sortOrder, setSortOrder] = useState('내림차순')
   const [keywordCount, setKeywordCount] = useState('')
+  const [startDate, setStartDate] = useState(firstDayOfMonth.toISOString().split('T')[0])
+  const [endDate, setEndDate] = useState(today.toISOString().split('T')[0])
   
   // 검색 결과 상태 관리
   const [filteredKeywords, setFilteredKeywords] = useState([])
@@ -798,6 +804,52 @@ function DailyDataContent() {
                   {media}
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* 기간 설정 */}
+          <div style={{ flex: '1' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '8px', 
+              fontWeight: '600',
+              color: '#495057'
+            }}>기간 설정</label>
+            <div style={{ 
+              display: 'flex', 
+              gap: '15px',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>시작일</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{
+                    padding: '6px 8px',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem',
+                    width: '140px'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>종료일</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{
+                    padding: '6px 8px',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem',
+                    width: '140px'
+                  }}
+                />
+              </div>
             </div>
           </div>
           
@@ -1130,11 +1182,17 @@ function DailyDataContent() {
 function KeywordDataContent() {
   const { selectedAdvertiser } = useAuth()
   
+  // 당월 1일과 당일 계산
+  const today = new Date()
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  
   // 필터 상태 관리
   const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타'])
   const [keywordMetric, setKeywordMetric] = useState('광고비')
   const [sortOrder, setSortOrder] = useState('내림차순')
   const [keywordCount, setKeywordCount] = useState('')
+  const [startDate, setStartDate] = useState(firstDayOfMonth.toISOString().split('T')[0])
+  const [endDate, setEndDate] = useState(today.toISOString().split('T')[0])
   
   // 검색 결과 상태 관리
   const [filteredKeywords, setFilteredKeywords] = useState([])
@@ -1433,6 +1491,52 @@ function KeywordDataContent() {
                   {media}
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* 기간 설정 */}
+          <div style={{ flex: '1' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '8px', 
+              fontWeight: '600',
+              color: '#495057'
+            }}>기간 설정</label>
+            <div style={{ 
+              display: 'flex', 
+              gap: '15px',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>시작일</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{
+                    padding: '6px 8px',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem',
+                    width: '140px'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>종료일</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{
+                    padding: '6px 8px',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem',
+                    width: '140px'
+                  }}
+                />
+              </div>
             </div>
           </div>
           
