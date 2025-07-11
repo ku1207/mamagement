@@ -42,8 +42,8 @@ const KPICards = ({ data, dateRange, selectedFilters }) => {
       conversions: totals.conversions,
       cost: totals.cost,
       roas: totals.cost > 0 ? (totals.revenue / totals.cost) : 0,
-      ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
-      cpc: totals.clicks > 0 ? (totals.cost / totals.clicks) : 0,
+      ctr: totals.impressions > 0 ? parseFloat(((totals.clicks / totals.impressions) * 100).toFixed(1)) : 0,
+      cpc: totals.clicks > 0 ? Math.round(totals.cost / totals.clicks) : 0,
       cpa: totals.conversions > 0 ? (totals.cost / totals.conversions) : 0
     };
   };
@@ -60,11 +60,11 @@ const KPICards = ({ data, dateRange, selectedFilters }) => {
   };
 
   const formatCurrency = (num) => {
-    return '₩' + num.toLocaleString();
+    return num.toLocaleString();
   };
 
   const formatPercent = (num) => {
-    return num.toFixed(2) + '%';
+    return num.toFixed(1) + '%';
   };
 
   const kpiData = [

@@ -63,9 +63,9 @@ const DataTable = ({
       id: `${item.platform}-${item.campaign}-${item.adGroup}`,
       platformLabel: platformLabels[item.platform] || item.platform,
       adTypeLabel: adTypeLabels[item.adType] || item.adType,
-      ctr: item.impressions > 0 ? (item.clicks / item.impressions) * 100 : 0,
+      ctr: item.impressions > 0 ? parseFloat(((item.clicks / item.impressions) * 100).toFixed(1)) : 0,
       conversionRate: item.clicks > 0 ? (item.conversions / item.clicks) * 100 : 0,
-      cpc: item.clicks > 0 ? (item.cost / item.clicks) : 0,
+      cpc: item.clicks > 0 ? Math.round(item.cost / item.clicks) : 0,
       cpa: item.conversions > 0 ? (item.cost / item.conversions) : 0,
       roas: item.cost > 0 ? (item.revenue / item.cost) : 0
     }));
@@ -173,7 +173,7 @@ const DataTable = ({
       case 'cpc':
         return '₩' + value.toLocaleString();
       case 'ctr':
-        return value.toFixed(2) + '%';
+        return value.toFixed(1) + '%';
       case 'impressions':
       case 'clicks':
         return value.toLocaleString();

@@ -25,7 +25,8 @@ const InteractiveChart = ({ data, selectedFilters, dateRange }) => {
     naver: true,
     kakao: true,
     google: true,
-    facebook: true
+    facebook: true,
+    tiktok: true
   });
 
   const metrics = [
@@ -50,14 +51,16 @@ const InteractiveChart = ({ data, selectedFilters, dateRange }) => {
     naver: '#1EC800',
     kakao: '#FFE812',
     google: '#4285F4',
-    facebook: '#1877F2'
+    facebook: '#1877F2',
+    tiktok: '#FF0050'
   };
 
   const platformLabels = {
     naver: '네이버',
     kakao: '카카오',
     google: '구글',
-    facebook: '페이스북'
+    facebook: '페이스북',
+    tiktok: '틱톡'
   };
 
   // 차트 데이터 가공
@@ -93,10 +96,10 @@ const InteractiveChart = ({ data, selectedFilters, dateRange }) => {
           value = item.cost || 0;
           break;
         case 'ctr':
-          value = item.impressions > 0 ? (item.clicks / item.impressions) * 100 : 0;
+          value = item.impressions > 0 ? parseFloat(((item.clicks / item.impressions) * 100).toFixed(1)) : 0;
           break;
         case 'cpc':
-          value = item.clicks > 0 ? (item.cost / item.clicks) : 0;
+          value = item.clicks > 0 ? Math.round(item.cost / item.clicks) : 0;
           break;
         case 'cpa':
           value = item.conversions > 0 ? (item.cost / item.conversions) : 0;
@@ -162,7 +165,7 @@ const InteractiveChart = ({ data, selectedFilters, dateRange }) => {
     if (selectedMetric === 'cost' || selectedMetric === 'cpc' || selectedMetric === 'cpa') {
       return '₩' + value.toLocaleString();
     } else if (selectedMetric === 'ctr') {
-      return value.toFixed(2) + '%';
+      return value.toFixed(1) + '%';
     } else if (selectedMetric === 'roas') {
       return value.toFixed(2);
     }

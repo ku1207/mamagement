@@ -21,9 +21,9 @@ const ExportBar = ({ selectedRows, data, onExport, onClear }) => {
   };
 
   const totals = calculateTotals();
-  const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+  const ctr = totals.impressions > 0 ? parseFloat(((totals.clicks / totals.impressions) * 100).toFixed(1)) : 0;
   const roas = totals.cost > 0 ? (totals.revenue / totals.cost) : 0;
-  const cpc = totals.clicks > 0 ? (totals.cost / totals.clicks) : 0;
+  const cpc = totals.clicks > 0 ? Math.round(totals.cost / totals.clicks) : 0;
   const cpa = totals.conversions > 0 ? (totals.cost / totals.conversions) : 0;
   const conversionRate = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
 
@@ -37,7 +37,7 @@ const ExportBar = ({ selectedRows, data, onExport, onClear }) => {
   };
 
   const formatCurrency = (num) => {
-    return '₩' + num.toLocaleString();
+    return num.toLocaleString();
   };
 
   const exportOptions = [
@@ -105,7 +105,7 @@ const ExportBar = ({ selectedRows, data, onExport, onClear }) => {
             </div>
             <div className="kpi-summary-item">
               <span className="kpi-summary-label">CTR</span>
-              <span className="kpi-summary-value">{ctr.toFixed(2)}%</span>
+              <span className="kpi-summary-value">{ctr.toFixed(1)}%</span>
             </div>
             <div className="kpi-summary-item">
               <span className="kpi-summary-label">ROAS</span>

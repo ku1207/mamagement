@@ -22,15 +22,26 @@ const DashboardContainer = () => {
 
   // 가상 데이터 생성
   const generateMockData = () => {
-    const platforms = ['naver', 'kakao', 'google', 'facebook'];
+    const platforms = ['naver', 'kakao', 'google', 'facebook', 'tiktok'];
     const adTypes = ['search', 'banner', 'video', 'shopping'];
     const campaigns = [
       '브랜딩 캠페인', '세일 프로모션', '신제품 런칭', '리타겟팅 캠페인',
       '키워드 마케팅', '디스플레이 광고', '동영상 광고', '쇼핑 광고'
     ];
+    
+    // 틱톡 전용 캠페인 추가
+    const tiktokCampaigns = [
+      '챌린지 캠페인', '인플루언서 콜라보', '바이럴 마케팅', '트렌드 마케팅'
+    ];
+    
     const adGroups = [
       '브랜드 키워드', '일반 키워드', '경쟁사 키워드', '상품명 키워드',
       '카테고리 키워드', '지역 키워드', '시즌 키워드', '이벤트 키워드'
+    ];
+    
+    // 틱톡 전용 광고 그룹 추가
+    const tiktokAdGroups = [
+      '해시태그 그룹', '트렌드 그룹', '댄스 챌린지', '브랜드 챌린지'
     ];
 
     const data = [];
@@ -41,9 +52,21 @@ const DashboardContainer = () => {
       const dateStr = date.toISOString().split('T')[0];
 
       platforms.forEach(platform => {
-        adTypes.forEach(adType => {
-          campaigns.forEach(campaign => {
-            adGroups.forEach(adGroup => {
+        const currentAdTypes = platform === 'tiktok' 
+          ? [...adTypes, 'spark_ads', 'brand_takeover', 'in_feed', 'branded_hashtag']
+          : adTypes;
+        
+        const currentCampaigns = platform === 'tiktok' 
+          ? [...campaigns, ...tiktokCampaigns]
+          : campaigns;
+        
+        const currentAdGroups = platform === 'tiktok' 
+          ? [...adGroups, ...tiktokAdGroups]
+          : adGroups;
+
+        currentAdTypes.forEach(adType => {
+          currentCampaigns.forEach(campaign => {
+            currentAdGroups.forEach(adGroup => {
               // 랜덤 성과 데이터 생성
               const impressions = Math.floor(Math.random() * 100000) + 1000;
               const clicks = Math.floor(impressions * (Math.random() * 0.1 + 0.01));

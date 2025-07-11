@@ -21,6 +21,7 @@ export default function Layout({ children, currentPage, setCurrentPage }) {
               {currentPage === 'kakao' && '카카오 광고'}
               {currentPage === 'google' && '구글 광고'}
               {currentPage === 'facebook' && '페이스북 광고'}
+              {currentPage === 'tiktok' && '틱톡 광고'}
             </h1>
             {selectedAdvertiser && user?.role !== 'admin' && (
               <div className="selected-advertiser-display">

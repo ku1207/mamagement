@@ -16,7 +16,8 @@ const FilterSection = ({
     { value: 'naver', label: '네이버' },
     { value: 'kakao', label: '카카오' },
     { value: 'google', label: '구글' },
-    { value: 'facebook', label: '페이스북' }
+    { value: 'facebook', label: '페이스북' },
+    { value: 'tiktok', label: '틱톡' }
   ];
 
   const adTypes = [

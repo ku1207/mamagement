@@ -30,7 +30,8 @@ export default function Navigation({ currentPage, setCurrentPage }) {
         { id: 'naver', label: '네이버 광고', icon: '🟢' },
         { id: 'kakao', label: '카카오 광고', icon: '💛' },
         { id: 'google', label: '구글 광고', icon: '🔍' },
-        { id: 'facebook', label: '페이스북 광고', icon: '📘' }
+        { id: 'facebook', label: '페이스북 광고', icon: '📘' },
+        { id: 'tiktok', label: '틱톡 광고', icon: '🎵' }
       ]
     }
   }

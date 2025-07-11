@@ -1,10 +1,15 @@
 import Layout from '../components/Layout'
 import ProtectedRoute from '../components/ProtectedRoute'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useAuth, ROLES } from '../context/AuthContext'
 import { useRouter } from 'next/router'
 import DashboardContainer from '../components/Dashboard/DashboardContainer'
 import SuperAdminDashboard from '../components/Dashboard/SuperAdminDashboard'
+import FilterSection from '../components/Dashboard/FilterSection'
+import KPICards from '../components/Dashboard/KPICards'
+import InteractiveChart from '../components/Dashboard/InteractiveChart'
+import DataTable from '../components/Dashboard/DataTable'
+import ExportBar from '../components/Dashboard/ExportBar'
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -34,6 +39,8 @@ export default function Home() {
         return <MediaContent media="구글" />
       case 'facebook':
         return <MediaContent media="페이스북" />
+      case 'tiktok':
+        return <MediaContent media="틱톡" />
       case 'reports':
         return <ReportsContent />
       case 'advertisers':
@@ -94,6 +101,152 @@ function DashboardContent() {
 
 function MediaContent({ media }) {
   const { selectedAdvertiser } = useAuth()
+  const [dashboardData, setDashboardData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedRows, setSelectedRows] = useState([])
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    endDate: new Date()
+  })
+  const [selectedFilters, setSelectedFilters] = useState({
+    platforms: [media.toLowerCase() === '페이스북' ? 'facebook' : media.toLowerCase() === '네이버' ? 'naver' : media.toLowerCase() === '카카오' ? 'kakao' : media.toLowerCase() === '틱톡' ? 'tiktok' : 'google'],
+    adTypes: []
+  })
+
+  // 해당 매체의 가상 데이터 생성
+  const generateMediaData = () => {
+    const platformMap = {
+      '네이버': 'naver',
+      '카카오': 'kakao', 
+      '구글': 'google',
+      '페이스북': 'facebook',
+      '틱톡': 'tiktok'
+    }
+    
+    const platform = platformMap[media]
+    const adTypes = ['search', 'banner', 'video', 'shopping']
+    
+    // 틱톡 전용 광고 타입 추가
+    if (media === '틱톡') {
+      adTypes.push('spark_ads', 'brand_takeover', 'in_feed', 'branded_hashtag')
+    }
+    
+    const campaigns = [
+      `${media} 브랜딩 캠페인`, `${media} 세일 프로모션`, `${media} 신제품 런칭`, `${media} 리타겟팅 캠페인`,
+      `${media} 키워드 마케팅`, `${media} 디스플레이 광고`, `${media} 동영상 광고`, `${media} 쇼핑 광고`
+    ]
+    
+    // 틱톡 전용 캠페인 추가
+    if (media === '틱톡') {
+      campaigns.push(`${media} 챌린지 캠페인`, `${media} 인플루언서 콜라보`, `${media} 바이럴 마케팅`)
+    }
+    
+    const adGroups = [
+      '브랜드 키워드', '일반 키워드', '경쟁사 키워드', '상품명 키워드',
+      '카테고리 키워드', '지역 키워드', '시즌 키워드', '이벤트 키워드'
+    ]
+    
+    // 틱톡 전용 광고 그룹 추가
+    if (media === '틱톡') {
+      adGroups.push('해시태그 그룹', '트렌드 그룹', '댄스 챌린지', '브랜드 챌린지')
+    }
+
+    const data = []
+    const dateCount = 30 // 30일치 데이터
+
+    for (let i = 0; i < dateCount; i++) {
+      const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+      const dateStr = date.toISOString().split('T')[0]
+
+      adTypes.forEach(adType => {
+        campaigns.forEach(campaign => {
+          adGroups.forEach(adGroup => {
+            // 랜덤 성과 데이터 생성
+            const impressions = Math.floor(Math.random() * 100000) + 1000
+            const clicks = Math.floor(impressions * (Math.random() * 0.1 + 0.01))
+            const conversions = Math.floor(clicks * (Math.random() * 0.2 + 0.01))
+            const cost = Math.floor((clicks * (Math.random() * 2000 + 100)))
+            const revenue = Math.floor(conversions * (Math.random() * 50000 + 10000))
+
+            data.push({
+              date: dateStr,
+              platform,
+              adType,
+              campaign,
+              adGroup,
+              impressions,
+              clicks,
+              conversions,
+              cost,
+              revenue,
+              advertiser: selectedAdvertiser?.name || 'A광고주'
+            })
+          })
+        })
+      })
+    }
+
+    return data
+  }
+
+  useEffect(() => {
+    // 매체별 데이터 로드
+    const loadMediaData = async () => {
+      setLoading(true)
+      
+      try {
+        // 가상 데이터 생성 (실제로는 API 호출)
+        const mockData = generateMediaData()
+        
+        // 광고주 필터링
+        const filteredData = mockData.filter(item => 
+          !selectedAdvertiser || item.advertiser === selectedAdvertiser.name
+        )
+        
+        // 날짜 범위 필터링
+        const dateFilteredData = filteredData.filter(item => {
+          const itemDate = new Date(item.date)
+          return itemDate >= dateRange.startDate && itemDate <= dateRange.endDate
+        })
+        
+        setDashboardData(dateFilteredData)
+      } catch (error) {
+        console.error('매체 데이터 로드 실패:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadMediaData()
+  }, [selectedAdvertiser, dateRange, media])
+
+  const handleApplyFilters = () => {
+    // 필터 적용 시 데이터 새로고침
+    const filteredData = dashboardData.filter(item => {
+      if (selectedFilters.platforms && selectedFilters.platforms.length > 0) {
+        if (!selectedFilters.platforms.includes(item.platform)) return false
+      }
+      if (selectedFilters.adTypes && selectedFilters.adTypes.length > 0) {
+        if (!selectedFilters.adTypes.includes(item.adType)) return false
+      }
+      return true
+    })
+
+    setDashboardData(filteredData)
+  }
+
+  const handleRowSelect = (rows) => {
+    setSelectedRows(rows)
+  }
+
+  const handleExport = (type, rows) => {
+    // 내보내기 로직 구현
+    console.log(`Exporting ${type} for rows:`, rows)
+  }
+
+  const handleClearSelection = () => {
+    setSelectedRows([])
+  }
 
   if (!selectedAdvertiser) {
     return (
@@ -106,57 +259,59 @@ function MediaContent({ media }) {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="content-area">
+        <div className="loading-dashboard">
+          <div className="loading-spinner"></div>
+          <span className="loading-text">{media} 광고 데이터 로딩 중...</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="content-area">
-      <div className="media-overview">
-        <h2>{selectedAdvertiser.name} - {media} 광고</h2>
-        <p>{selectedAdvertiser.name}의 {media} 광고 캠페인 성과를 관리하고 분석하세요.</p>
-      </div>
+      <div className="dashboard-container" style={{ paddingBottom: '120px' }}>
+        {/* 필터 섹션 */}
+        <FilterSection
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          selectedFilters={selectedFilters}
+          setSelectedFilters={setSelectedFilters}
+          onApplyFilters={handleApplyFilters}
+        />
 
-      <div className="media-stats">
-        <div className="stat-card">
-          <h4>이번 달 광고비</h4>
-          <p className="stat-value">₩2,345,678</p>
-        </div>
-        <div className="stat-card">
-          <h4>활성 캠페인</h4>
-          <p className="stat-value">8</p>
-        </div>
-        <div className="stat-card">
-          <h4>클릭률</h4>
-          <p className="stat-value">2.8%</p>
-        </div>
-        <div className="stat-card">
-          <h4>전환율</h4>
-          <p className="stat-value">1.2%</p>
-        </div>
-      </div>
+        {/* KPI 카드 */}
+        <KPICards
+          data={dashboardData}
+          dateRange={dateRange}
+          selectedFilters={selectedFilters}
+        />
 
-      <div className="campaign-list">
-        <h3>활성 캠페인 목록</h3>
-        <div className="campaign-grid">
-          <div className="campaign-item">
-            <h4>브랜드 검색 캠페인</h4>
-            <p>상태: <span className="status active">활성</span></p>
-            <p>예산: ₩50,000/일</p>
-            <p>클릭률: 3.2%</p>
-            <p>광고주: {selectedAdvertiser.name}</p>
-          </div>
-          <div className="campaign-item">
-            <h4>제품 홍보 캠페인</h4>
-            <p>상태: <span className="status active">활성</span></p>
-            <p>예산: ₩30,000/일</p>
-            <p>클릭률: 2.8%</p>
-            <p>광고주: {selectedAdvertiser.name}</p>
-          </div>
-          <div className="campaign-item">
-            <h4>브랜드 인지도 캠페인</h4>
-            <p>상태: <span className="status paused">일시정지</span></p>
-            <p>예산: ₩20,000/일</p>
-            <p>클릭률: 1.9%</p>
-            <p>광고주: {selectedAdvertiser.name}</p>
-          </div>
-        </div>
+        {/* 인터랙티브 차트 */}
+        <InteractiveChart
+          data={dashboardData}
+          selectedFilters={selectedFilters}
+          dateRange={dateRange}
+        />
+
+        {/* 데이터 테이블 */}
+        <DataTable
+          data={dashboardData}
+          selectedFilters={selectedFilters}
+          onRowSelect={handleRowSelect}
+          selectedRows={selectedRows}
+          onExport={handleExport}
+        />
+
+        {/* 하단 내보내기 바 */}
+        <ExportBar
+          selectedRows={selectedRows}
+          data={dashboardData}
+          onExport={handleExport}
+          onClear={handleClearSelection}
+        />
       </div>
     </div>
   )
@@ -504,21 +659,40 @@ function UnauthorizedContent() {
 function DailyDataContent() {
   const { selectedAdvertiser } = useAuth()
   
-  // 당월 1일과 당일 계산
+  // 어제 날짜 계산 (로컬 시간 기준)
   const today = new Date()
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  
+  // 로컬 시간 기준으로 YYYY-MM-DD 형식 변환
+  const formatLocalDate = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
   
   // 필터 상태 관리
-  const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타'])
+  const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타', '틱톡'])
   const [keywordMetric, setKeywordMetric] = useState('광고비')
   const [sortOrder, setSortOrder] = useState('내림차순')
   const [keywordCount, setKeywordCount] = useState('')
-  const [startDate, setStartDate] = useState(firstDayOfMonth.toISOString().split('T')[0])
-  const [endDate, setEndDate] = useState(today.toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(formatLocalDate(yesterday))
+  const [costRangeMin, setCostRangeMin] = useState('')
+  const [costRangeMax, setCostRangeMax] = useState('')
   
   // 검색 결과 상태 관리
   const [filteredKeywords, setFilteredKeywords] = useState([])
   const [keywordData, setKeywordData] = useState([])
+  const [dailyData, setDailyData] = useState([])
+  const [filteredDailyData, setFilteredDailyData] = useState([])
+  const [periodSummary, setPeriodSummary] = useState({
+    totalImpressions: 0,
+    totalClicks: 0,
+    totalCost: 0,
+    avgCtr: 0,
+    avgCpc: 0
+  })
   
   // 키워드 행 선택 및 슬라이드 상태 관리
   const [selectedKeywordIndex, setSelectedKeywordIndex] = useState(null)
@@ -527,6 +701,29 @@ function DailyDataContent() {
   // 일자별 행 선택 및 슬라이드 상태 관리
   const [selectedDateIndex, setSelectedDateIndex] = useState(null)
   const [expandedDateData, setExpandedDateData] = useState([])
+  
+  // 상세 데이터 필터 및 페이지네이션 상태
+  const [selectedDataFilters, setSelectedDataFilters] = useState(['광고비', 'CPC'])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [horizontalScrollPosition, setHorizontalScrollPosition] = useState(0)
+  
+  // 스크롤바 동기화를 위한 ref
+  const topScrollRef = useRef(null)
+  const tableScrollRef = useRef(null)
+  
+  // 상단 스크롤바와 테이블 스크롤 동기화
+  const handleTopScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft
+    }
+  }
+  
+  const handleTableScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft
+    }
+  }
   
   if (!selectedAdvertiser) {
     return (
@@ -571,8 +768,17 @@ function DailyDataContent() {
 
   // 검색 버튼 클릭 핸들러
   const handleSearch = () => {
-    const results = getFilteredKeywords()
-    setFilteredKeywords(results)
+    // 일자별 데이터 필터링
+    const dailyResults = getFilteredDailyData()
+    setFilteredDailyData(dailyResults)
+    
+    // 기간별 요약 정보 계산
+    const summary = calculatePeriodSummary(dailyResults)
+    setPeriodSummary(summary)
+    
+    // 키워드 데이터 필터링
+    const keywordResults = getFilteredKeywords()
+    setFilteredKeywords(keywordResults)
   }
 
   // 키워드 행 클릭 핸들러
@@ -597,15 +803,15 @@ function DailyDataContent() {
       setExpandedDateData([])
     } else {
       // 해당 날짜의 매체별 데이터 생성
-      const mediaData = ['네이버', '카카오', '구글', '메타'].map(media => ({
+      const mediaData = ['네이버', '카카오', '구글', '메타', '틱톡'].map(media => ({
         date,
         media,
         campaign: `${media} 일자별 캠페인`,
         impressions: Math.floor(Math.random() * 15000) + 5000,
         clicks: Math.floor(Math.random() * 800) + 200,
-        ctr: ((Math.random() * 4) + 1).toFixed(2),
+        ctr: parseFloat(((Math.random() * 4) + 1).toFixed(1)),
         cpc: Math.floor(Math.random() * 600) + 200,
-        cost: Math.floor(Math.random() * 200000) + 50000,
+        cost: Math.floor(Math.random() * 400000) + 100000,
         conversions: Math.floor(Math.random() * 50) + 10,
         revenue: Math.floor(Math.random() * 500000) + 100000
       }))
@@ -623,68 +829,299 @@ function DailyDataContent() {
     setExpandedDateData([])
   }
 
-  // 일자별 샘플 데이터 생성
+  // 일자별 고정 더미 데이터 생성
   const generateDailyData = () => {
+    const fixedData = [
+      { impressions: 25000, clicks: 1250, conversions: 75, cost: 300000, revenue: 600000, cpc: 240 },
+      { impressions: 32000, clicks: 1600, conversions: 95, cost: 380000, revenue: 750000, cpc: 238 },
+      { impressions: 28000, clicks: 1400, conversions: 82, cost: 335000, revenue: 680000, cpc: 239 },
+      { impressions: 35000, clicks: 1750, conversions: 105, cost: 420000, revenue: 850000, cpc: 240 },
+      { impressions: 22000, clicks: 1100, conversions: 65, cost: 265000, revenue: 530000, cpc: 241 },
+      { impressions: 40000, clicks: 2000, conversions: 120, cost: 480000, revenue: 960000, cpc: 240 },
+      { impressions: 30000, clicks: 1500, conversions: 90, cost: 360000, revenue: 720000, cpc: 240 },
+    ]
+    
     const data = []
     for (let i = 30; i >= 0; i--) {
       const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+      const dayData = fixedData[i % fixedData.length]
+      // 광고비는 최소 50000원 이상 보장, 전환수는 최대 999개 제한
+      const cost = Math.max(50000, dayData.cost)
+      const conversions = Math.min(999, dayData.conversions)
+      
       data.push({
         date: date.toISOString().split('T')[0],
-        impressions: Math.floor(Math.random() * 50000) + 10000,
-        clicks: Math.floor(Math.random() * 2000) + 500,
-        conversions: Math.floor(Math.random() * 100) + 20,
-        cost: Math.floor(Math.random() * 500000) + 100000,
-        revenue: Math.floor(Math.random() * 1000000) + 200000,
-        cpc: Math.floor(Math.random() * 800) + 200
+        impressions: dayData.impressions,
+        clicks: dayData.clicks,
+        conversions: conversions,
+        cost: cost,
+        revenue: dayData.revenue,
+        cpc: dayData.cpc
       })
     }
     return data
   }
 
-  // 키워드 샘플 데이터 생성
+  // 키워드 고정 더미 데이터 생성
   const generateKeywordData = () => {
-    const keywords = [
-      '브랜드명', '제품명', '카테고리', '경쟁사', '일반키워드', 
-      '롱테일키워드', '상품후기', '가격비교', '이벤트', '할인',
-      '신제품', '인기상품', '추천', '베스트', '특가'
+    const fixedKeywordData = [
+      { keyword: '브랜드명', media: '네이버', campaign: '네이버 브랜드 캠페인', adGroup: '네이버 브랜드 키워드', impressions: 15000, clicks: 750, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 130000, cost_yesterday: 128000, cost_7days: 320000, cost_last_week: 325000 },
+              { keyword: '브랜드명', media: '구글', campaign: '구글 브랜드 캠페인', adGroup: '구글 브랜드 키워드', impressions: 12000, clicks: 600, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 120000, cost_yesterday: 118000, cost_7days: 280000, cost_last_week: 285000 },
+              { keyword: '브랜드명', media: '카카오', campaign: '카카오 브랜드 캠페인', adGroup: '카카오 브랜드 키워드', impressions: 10000, clicks: 500, ctr: 5.0, cpc_today: 380, cpc_yesterday: 375, cpc_7days: 378, cpc_last_week: 382, cost_today: 110000, cost_yesterday: 108000, cost_7days: 240000, cost_last_week: 245000 },
+        { keyword: '브랜드명', media: '메타', campaign: '메타 브랜드 캠페인', adGroup: '메타 브랜드 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 400, cpc_yesterday: 395, cpc_7days: 398, cpc_last_week: 402, cost_today: 100000, cost_yesterday: 108000, cost_7days: 200000, cost_last_week: 205000 },
+      { keyword: '브랜드명', media: '틱톡', campaign: '틱톡 브랜드 캠페인', adGroup: '틱톡 브랜드 키워드', impressions: 50000, clicks: 2500, ctr: 5.0, cpc_today: 180, cpc_yesterday: 175, cpc_7days: 178, cpc_last_week: 182, cost_today: 150000, cost_yesterday: 148000, cost_7days: 600000, cost_last_week: 605000 },
+      
+      { keyword: '제품명', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 18000, clicks: 900, ctr: 5.0, cpc_today: 280, cpc_yesterday: 275, cpc_7days: 278, cpc_last_week: 282, cost_today: 95000, cost_yesterday: 92000, cost_7days: 380000, cost_last_week: 385000 },
+      { keyword: '제품명', media: '카카오', campaign: '카카오 제품 캠페인', adGroup: '카카오 제품 키워드', impressions: 14000, clicks: 700, ctr: 5.0, cpc_today: 300, cpc_yesterday: 295, cpc_7days: 298, cpc_last_week: 302, cost_today: 75000, cost_yesterday: 73000, cost_7days: 300000, cost_last_week: 305000 },
+      { keyword: '제품명', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 68000, cost_yesterday: 66000, cost_7days: 270000, cost_last_week: 275000 },
+      { keyword: '제품명', media: '메타', campaign: '메타 제품 캠페인', adGroup: '메타 제품 키워드', impressions: 9000, clicks: 450, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 55000, cost_yesterday: 53000, cost_7days: 220000, cost_last_week: 225000 },
+      { keyword: '제품명', media: '틱톡', campaign: '틱톡 제품 캠페인', adGroup: '틱톡 제품 키워드', impressions: 45000, clicks: 2250, ctr: 5.0, cpc_today: 200, cpc_yesterday: 195, cpc_7days: 198, cpc_last_week: 202, cost_today: 140000, cost_yesterday: 138000, cost_7days: 560000, cost_last_week: 565000 },
+      
+      { keyword: '카테고리', media: '구글', campaign: '구글 카테고리 캠페인', adGroup: '구글 핵심 키워드', impressions: 20000, clicks: 1000, ctr: 5.0, cpc_today: 250, cpc_yesterday: 245, cpc_7days: 248, cpc_last_week: 252, cost_today: 100000, cost_yesterday: 98000, cost_7days: 400000, cost_last_week: 405000 },
+      { keyword: '카테고리', media: '메타', campaign: '메타 카테고리 캠페인', adGroup: '메타 핵심 키워드', impressions: 16000, clicks: 800, ctr: 5.0, cpc_today: 275, cpc_yesterday: 270, cpc_7days: 273, cpc_last_week: 277, cost_today: 85000, cost_yesterday: 83000, cost_7days: 340000, cost_last_week: 345000 },
+      { keyword: '카테고리', media: '네이버', campaign: '네이버 카테고리 캠페인', adGroup: '네이버 핵심 키워드', impressions: 13000, clicks: 650, ctr: 5.0, cpc_today: 290, cpc_yesterday: 285, cpc_7days: 288, cpc_last_week: 292, cost_today: 72000, cost_yesterday: 70000, cost_7days: 290000, cost_last_week: 295000 },
+      { keyword: '카테고리', media: '카카오', campaign: '카카오 카테고리 캠페인', adGroup: '카카오 핵심 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 310, cpc_yesterday: 305, cpc_7days: 308, cpc_last_week: 312, cost_today: 64000, cost_yesterday: 62000, cost_7days: 250000, cost_last_week: 255000 },
+      { keyword: '카테고리', media: '틱톡', campaign: '틱톡 카테고리 캠페인', adGroup: '틱톡 카테고리 키워드', impressions: 40000, clicks: 2000, ctr: 5.0, cpc_today: 170, cpc_yesterday: 165, cpc_7days: 168, cpc_last_week: 172, cost_today: 130000, cost_yesterday: 128000, cost_7days: 520000, cost_last_week: 525000 },
+      
+      { keyword: '경쟁사', media: '네이버', campaign: '네이버 브랜드 캠페인', adGroup: '네이버 브랜드 키워드', impressions: 10000, clicks: 500, ctr: 5.0, cpc_today: 400, cpc_yesterday: 395, cpc_7days: 398, cpc_last_week: 402, cost_today: 65000, cost_yesterday: 63000, cost_7days: 260000, cost_last_week: 265000 },
+      { keyword: '경쟁사', media: '구글', campaign: '구글 브랜드 캠페인', adGroup: '구글 브랜드 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 420, cpc_yesterday: 415, cpc_7days: 418, cpc_last_week: 422, cost_today: 58000, cost_yesterday: 56000, cost_7days: 230000, cost_last_week: 235000 },
+      
+      { keyword: '일반키워드', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 22000, clicks: 1100, ctr: 5.0, cpc_today: 230, cpc_yesterday: 225, cpc_7days: 228, cpc_last_week: 232, cost_today: 110000, cost_yesterday: 108000, cost_7days: 440000, cost_last_week: 445000 },
+      { keyword: '일반키워드', media: '카카오', campaign: '카카오 제품 캠페인', adGroup: '카카오 제품 키워드', impressions: 13000, clicks: 650, ctr: 5.0, cpc_today: 260, cpc_yesterday: 255, cpc_7days: 258, cpc_last_week: 262, cost_today: 72000, cost_yesterday: 70000, cost_7days: 290000, cost_last_week: 295000 },
+      
+      { keyword: '롱테일키워드', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 55000, cost_yesterday: 53000, cost_7days: 220000, cost_last_week: 225000 },
+      
+      { keyword: '상품후기', media: '메타', campaign: '메타 브랜드 캠페인', adGroup: '메타 브랜드 키워드', impressions: 12000, clicks: 600, ctr: 5.0, cpc_today: 300, cpc_yesterday: 295, cpc_7days: 298, cpc_last_week: 302, cost_today: 68000, cost_yesterday: 66000, cost_7days: 270000, cost_last_week: 275000 },
+      
+      { keyword: '가격비교', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 17000, clicks: 850, ctr: 5.0, cpc_today: 290, cpc_yesterday: 285, cpc_7days: 288, cpc_last_week: 292, cost_today: 88000, cost_yesterday: 86000, cost_7days: 350000, cost_last_week: 355000 },
+      { keyword: '가격비교', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 64000, cost_yesterday: 62000, cost_7days: 250000, cost_last_week: 255000 },
+      
+      { keyword: '이벤트', media: '카카오', campaign: '카카오 카테고리 캠페인', adGroup: '카카오 핵심 키워드', impressions: 25000, clicks: 1250, ctr: 5.0, cpc_today: 200, cpc_yesterday: 195, cpc_7days: 198, cpc_last_week: 202, cost_today: 120000, cost_yesterday: 118000, cost_7days: 480000, cost_last_week: 485000 },
+      
+      { keyword: '할인', media: '메타', campaign: '메타 제품 캠페인', adGroup: '메타 제품 키워드', impressions: 19000, clicks: 950, ctr: 5.0, cpc_today: 260, cpc_yesterday: 255, cpc_7days: 258, cpc_last_week: 262, cost_today: 95000, cost_yesterday: 93000, cost_7days: 380000, cost_last_week: 385000 },
+      
+      // 틱톡 전용 키워드 데이터 추가
+      { keyword: '챌린지', media: '틱톡', campaign: '틱톡 바이럴 챌린지', adGroup: '틱톡 해시태그 키워드', impressions: 80000, clicks: 4000, ctr: 5.0, cpc_today: 150, cpc_yesterday: 145, cpc_7days: 148, cpc_last_week: 152, cost_today: 200000, cost_yesterday: 198000, cost_7days: 800000, cost_last_week: 805000 },
+      { keyword: '댄스', media: '틱톡', campaign: '틱톡 댄스 챌린지', adGroup: '틱톡 댄스 키워드', impressions: 75000, clicks: 3750, ctr: 5.0, cpc_today: 160, cpc_yesterday: 155, cpc_7days: 158, cpc_last_week: 162, cost_today: 180000, cost_yesterday: 178000, cost_7days: 720000, cost_last_week: 725000 },
+      { keyword: '트렌드', media: '틱톡', campaign: '틱톡 트렌드 마케팅', adGroup: '틱톡 트렌드 키워드', impressions: 60000, clicks: 3000, ctr: 5.0, cpc_today: 190, cpc_yesterday: 185, cpc_7days: 188, cpc_last_week: 192, cost_today: 170000, cost_yesterday: 168000, cost_7days: 680000, cost_last_week: 685000 },
+      { keyword: '바이럴', media: '틱톡', campaign: '틱톡 바이럴 마케팅', adGroup: '틱톡 바이럴 키워드', impressions: 65000, clicks: 3250, ctr: 5.0, cpc_today: 175, cpc_yesterday: 170, cpc_7days: 173, cpc_last_week: 177, cost_today: 160000, cost_yesterday: 158000, cost_7days: 640000, cost_last_week: 645000 },
+      { keyword: '인플루언서', media: '틱톡', campaign: '틱톡 인플루언서 콜라보', adGroup: '틱톡 인플루언서 키워드', impressions: 55000, clicks: 2750, ctr: 5.0, cpc_today: 210, cpc_yesterday: 205, cpc_7days: 208, cpc_last_week: 212, cost_today: 190000, cost_yesterday: 188000, cost_7days: 760000, cost_last_week: 765000 }
     ]
     
-    const medias = ['네이버', '카카오', '구글', '메타']
-    const campaigns = ['브랜드캠페인', '제품캠페인', '이벤트캠페인']
-    const adGroups = ['그룹A', '그룹B', '그룹C']
-    
-    const data = []
-    
-    keywords.forEach(keyword => {
-      // 각 키워드당 1-3개의 매체 데이터 생성
-      const numMedias = Math.floor(Math.random() * 3) + 1
-      const selectedMedias = medias.slice(0, numMedias)
-      
-      selectedMedias.forEach(media => {
-        data.push({
-          keyword,
-          media,
-          campaign: campaigns[Math.floor(Math.random() * campaigns.length)],
-          adGroup: adGroups[Math.floor(Math.random() * adGroups.length)],
-          impressions: Math.floor(Math.random() * 20000) + 5000,
-          clicks: Math.floor(Math.random() * 800) + 200,
-          ctr: ((Math.random() * 5) + 1).toFixed(2),
-          cpc_today: Math.floor(Math.random() * 1000) + 200,
-          cpc_yesterday: Math.floor(Math.random() * 1000) + 200,
-          cpc_7days: Math.floor(Math.random() * 1000) + 200,
-          cpc_last_week: Math.floor(Math.random() * 1000) + 200,
-          cost_today: Math.floor(Math.random() * 100000) + 50000,
-          cost_yesterday: Math.floor(Math.random() * 100000) + 50000,
-          cost_7days: Math.floor(Math.random() * 500000) + 200000,
-          cost_last_week: Math.floor(Math.random() * 500000) + 200000
-        })
-      })
-    })
-    
-    return data
+    // 모든 키워드 데이터의 광고비가 0원이 되지 않도록 하고, 전환수를 적절히 설정
+    return fixedKeywordData.map(item => ({
+      ...item,
+      cost_today: Math.max(50000, item.cost_today),
+      cost_yesterday: Math.max(50000, item.cost_yesterday),
+      cost_7days: Math.max(50000, item.cost_7days),
+      cost_last_week: Math.max(50000, item.cost_last_week),
+      // 전환수는 클릭수의 8%로 설정하되 1,000개 미만으로 제한
+      conversions: Math.min(999, Math.floor(item.clicks * 0.08))
+    }))
   }
 
-  const dailyData = generateDailyData()
+  // 선택된 날짜에 따른 일자별 데이터 필터링
+  const getFilteredDailyData = () => {
+    if (!selectedDate) return dailyData
+
+    return dailyData.filter(item => {
+      return item.date === selectedDate
+    })
+  }
+
+  // 컴포넌트 마운트 시 데이터 생성
+  useEffect(() => {
+    if (selectedAdvertiser) {
+      // 일자별 데이터 생성
+      const initialData = generateDailyData()
+      setDailyData(initialData)
+      
+      // 키워드 데이터 생성
+      const keywordInitialData = generateKeywordData()
+      setKeywordData(keywordInitialData)
+      
+      // 초기 로딩 시 기본 검색 실행
+      setTimeout(() => {
+        handleSearch()
+      }, 100)
+    }
+  }, [selectedAdvertiser])
+
+  // 기간별 합산 정보 계산
+  const calculatePeriodSummary = (data) => {
+    // 데이터가 비어있거나 없을 때 기본값 설정
+    if (!data || data.length === 0) {
+      const defaultData = {
+        totalImpressions: 45000,
+        totalClicks: 2250,
+        totalCost: 540000,
+        totalConversions: 270,
+        avgCtr: 5.0,
+        avgCpc: 240,
+        avgCpa: 2000
+      }
+      
+      return {
+        ...defaultData,
+        // 전일 데이터
+        totalCostYesterday: Math.floor(defaultData.totalCost * 0.92),
+        totalConversionsYesterday: Math.floor(defaultData.totalConversions * 0.85),
+        avgCpcYesterday: Math.floor(defaultData.avgCpc * 1.08),
+        avgCpaYesterday: Math.floor(defaultData.avgCpa * 1.12),
+        avgCtrYesterday: parseFloat((defaultData.avgCtr * 0.94).toFixed(1)),
+        // 당일 데이터
+        totalCostToday: defaultData.totalCost,
+        // 등락률
+        costChangeRate: 8.7,
+        cpcChangeRate: -7.4,
+        conversionChangeRate: 17.6,
+        cpaChangeRate: -10.7,
+        ctrChangeRate: 6.4
+      }
+    }
+    
+    const totalImpressions = data.reduce((sum, item) => sum + item.impressions, 0)
+    const totalClicks = data.reduce((sum, item) => sum + item.clicks, 0)
+    const totalCost = data.reduce((sum, item) => sum + item.cost, 0)
+    const totalConversions = Math.floor(totalClicks * 0.12) // 전환수는 클릭수의 12%로 가정
+    
+    // 평균 CTR 계산 (전체 클릭수 / 전체 노출수)
+    const avgCtr = totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(1)) : 0
+    
+    // 평균 CPC 계산 (전체 광고비 / 전체 클릭수)
+    const avgCpc = totalClicks > 0 ? Math.round(totalCost / totalClicks) : 0
+    
+    // 평균 CPA 계산 (전체 광고비 / 전체 전환수)
+    const avgCpa = totalConversions > 0 ? Math.round(totalCost / totalConversions) : 0
+    
+    // 실제 더미 데이터 기반 등락률 계산
+    // 당일 데이터
+    const todayData = {
+      cost: totalCost,
+      cpc: avgCpc,
+      conversions: totalConversions,
+      cpa: avgCpa,
+      ctr: avgCtr,
+      impressions: totalImpressions,
+      clicks: totalClicks
+    }
+    
+    // 전일 데이터 (당일 대비 5~10% 감소)
+    const yesterdayData = {
+      cost: Math.floor(totalCost * 0.92),
+      cpc: Math.floor(avgCpc * 1.08),
+      conversions: Math.floor(totalConversions * 0.85),
+      cpa: Math.floor(avgCpa * 1.12),
+      ctr: parseFloat((avgCtr * 0.94).toFixed(1)),
+      impressions: Math.floor(totalImpressions * 0.88),
+      clicks: Math.floor(totalClicks * 0.92)
+    }
+    
+    // 최근 7일 데이터 (이전 7일 대비 3~7% 증가)
+    const recent7DaysData = {
+      cost: Math.floor(totalCost * 7.2),
+      cpc: Math.floor(avgCpc * 1.03),
+      conversions: Math.floor(totalConversions * 7.5),
+      cpa: Math.floor(avgCpa * 0.96),
+      ctr: parseFloat((avgCtr * 1.01).toFixed(1)),
+      impressions: Math.floor(totalImpressions * 6.9),
+      clicks: Math.floor(totalClicks * 7.0)
+    }
+    
+    // 이전 7일 데이터
+    const prev7DaysData = {
+      cost: Math.floor(totalCost * 6.8),
+      cpc: Math.floor(avgCpc * 1.12),
+      conversions: Math.floor(totalConversions * 6.5),
+      cpa: Math.floor(avgCpa * 1.07),
+      ctr: parseFloat((avgCtr * 1.05).toFixed(1)),
+      impressions: Math.floor(totalImpressions * 6.2),
+      clicks: Math.floor(totalClicks * 6.5)
+    }
+    
+    // 당월 데이터 (전월 대비 8~12% 감소)
+    const currentMonthData = {
+      cost: Math.floor(totalCost * 28.5),
+      cpc: Math.floor(avgCpc * 0.97),
+      conversions: Math.floor(totalConversions * 28.0),
+      cpa: Math.floor(avgCpa * 1.02),
+      ctr: parseFloat((avgCtr * 1.03).toFixed(1)),
+      impressions: Math.floor(totalImpressions * 29.3),
+      clicks: Math.floor(totalClicks * 30.1)
+    }
+    
+    // 전월 데이터
+    const prevMonthData = {
+      cost: Math.floor(totalCost * 31.2),
+      cpc: Math.floor(avgCpc * 1.05),
+      conversions: Math.floor(totalConversions * 31.8),
+      cpa: Math.floor(avgCpa * 0.98),
+      ctr: parseFloat((avgCtr * 0.94).toFixed(1)),
+      impressions: Math.floor(totalImpressions * 32.1),
+      clicks: Math.floor(totalClicks * 30.2)
+    }
+    
+    // 등락률 계산 (당일/전일 * 100 - 100)
+    const costChangeRate = yesterdayData.cost > 0 ? ((todayData.cost / yesterdayData.cost) * 100 - 100) : 0
+    const cpcChangeRate = yesterdayData.cpc > 0 ? ((todayData.cpc / yesterdayData.cpc) * 100 - 100) : 0
+    const conversionChangeRate = yesterdayData.conversions > 0 ? ((todayData.conversions / yesterdayData.conversions) * 100 - 100) : 0
+    const cpaChangeRate = yesterdayData.cpa > 0 ? ((todayData.cpa / yesterdayData.cpa) * 100 - 100) : 0
+    const ctrChangeRate = yesterdayData.ctr > 0 ? ((todayData.ctr / yesterdayData.ctr) * 100 - 100) : 0
+    
+    // 7일 기간 등락률 계산 (최근7일/이전7일 * 100 - 100)
+    const cost7DaysChangeRate = prev7DaysData.cost > 0 ? ((recent7DaysData.cost / prev7DaysData.cost) * 100 - 100) : 0
+    const cpc7DaysChangeRate = prev7DaysData.cpc > 0 ? ((recent7DaysData.cpc / prev7DaysData.cpc) * 100 - 100) : 0
+    const conversion7DaysChangeRate = prev7DaysData.conversions > 0 ? ((recent7DaysData.conversions / prev7DaysData.conversions) * 100 - 100) : 0
+    const cpa7DaysChangeRate = prev7DaysData.cpa > 0 ? ((recent7DaysData.cpa / prev7DaysData.cpa) * 100 - 100) : 0
+    const ctr7DaysChangeRate = prev7DaysData.ctr > 0 ? ((recent7DaysData.ctr / prev7DaysData.ctr) * 100 - 100) : 0
+    
+    // 월 기간 등락률 계산 (당월/전월 * 100 - 100)
+    const costMonthChangeRate = prevMonthData.cost > 0 ? ((currentMonthData.cost / prevMonthData.cost) * 100 - 100) : 0
+    const cpcMonthChangeRate = prevMonthData.cpc > 0 ? ((currentMonthData.cpc / prevMonthData.cpc) * 100 - 100) : 0
+    const conversionMonthChangeRate = prevMonthData.conversions > 0 ? ((currentMonthData.conversions / prevMonthData.conversions) * 100 - 100) : 0
+    const cpaMonthChangeRate = prevMonthData.cpa > 0 ? ((currentMonthData.cpa / prevMonthData.cpa) * 100 - 100) : 0
+    const ctrMonthChangeRate = prevMonthData.ctr > 0 ? ((currentMonthData.ctr / prevMonthData.ctr) * 100 - 100) : 0
+    
+    return {
+      totalImpressions,
+      totalClicks,
+      totalCost,
+      totalConversions,
+      avgCtr,
+      avgCpc,
+      avgCpa,
+      // 전일 데이터
+      totalCostYesterday: yesterdayData.cost,
+      totalConversionsYesterday: yesterdayData.conversions,
+      avgCpcYesterday: yesterdayData.cpc,
+      avgCpaYesterday: yesterdayData.cpa,
+      avgCtrYesterday: yesterdayData.ctr,
+      // 당일 데이터 (totalCostToday 추가)
+      totalCostToday: todayData.cost,
+      // 7일 데이터
+      recent7DaysData,
+      prev7DaysData,
+      // 월 데이터
+      currentMonthData,
+      prevMonthData,
+      // 등락률
+      costChangeRate,
+      cpcChangeRate,
+      conversionChangeRate,
+      cpaChangeRate,
+      ctrChangeRate,
+      cost7DaysChangeRate,
+      cpc7DaysChangeRate,
+      conversion7DaysChangeRate,
+      cpa7DaysChangeRate,
+      ctr7DaysChangeRate,
+      costMonthChangeRate,
+      cpcMonthChangeRate,
+      conversionMonthChangeRate,
+      cpaMonthChangeRate,
+      ctrMonthChangeRate
+    }
+  }
 
   // 키워드 데이터 필터링 및 정렬
   const getFilteredKeywords = () => {
@@ -724,15 +1161,44 @@ function DailyDataContent() {
         groupedByKeyword[item.keyword].impressions += item.impressions
         groupedByKeyword[item.keyword].clicks += item.clicks
         // CTR 재계산
-        groupedByKeyword[item.keyword].ctr = ((groupedByKeyword[item.keyword].clicks / groupedByKeyword[item.keyword].impressions) * 100).toFixed(2)
+        groupedByKeyword[item.keyword].ctr = parseFloat(((groupedByKeyword[item.keyword].clicks / groupedByKeyword[item.keyword].impressions) * 100).toFixed(1))
       }
     })
     
     // 그룹화된 데이터를 배열로 변환
     filtered = Object.values(groupedByKeyword)
     
-    // 광고비 기준 내림차순 정렬
-    filtered.sort((a, b) => b.cost_today - a.cost_today)
+    // CPC 선택 시 광고비 범위 필터링
+    if (keywordMetric === 'CPC') {
+      if (costRangeMin && !isNaN(costRangeMin)) {
+        filtered = filtered.filter(item => item.cost_today >= parseInt(costRangeMin))
+      }
+      if (costRangeMax && !isNaN(costRangeMax)) {
+        filtered = filtered.filter(item => item.cost_today <= parseInt(costRangeMax))
+      }
+    }
+    
+    // 선택된 지표에 따라 정렬
+    filtered.sort((a, b) => {
+      let valueA, valueB
+      switch (keywordMetric) {
+        case '클릭수':
+          valueA = a.clicks
+          valueB = b.clicks
+          break
+        case 'CPC':
+          valueA = a.cpc_today
+          valueB = b.cpc_today
+          break
+        case '광고비':
+        default:
+          valueA = a.cost_today
+          valueB = b.cost_today
+          break
+      }
+      
+      return sortOrder === '내림차순' ? valueB - valueA : valueA - valueB
+    })
     
     // 개수 제한
     if (keywordCount && !isNaN(keywordCount) && keywordCount > 0) {
@@ -742,20 +1208,20 @@ function DailyDataContent() {
     return filtered
   }
 
-  // 초기 데이터 설정
+  // 컴포넌트 마운트 시 데이터 생성
   useEffect(() => {
-    if (selectedAdvertiser) {
-      // 키워드 데이터 생성
-      const initialData = generateKeywordData()
-      setKeywordData(initialData)
-      
-      // 초기에는 모든 키워드 데이터를 표시 (광고비 기준 내림차순, 키워드별 그룹화)
-      setTimeout(() => {
-        const initialResults = getFilteredKeywords()
-        setFilteredKeywords(initialResults)
-      }, 0)
-    }
-  }, [selectedAdvertiser])
+    // 기본 데이터 생성 (페이지 진입 시 바로 표시)
+    const data = generateKeywordData()
+    setKeywordData(data)
+    
+    // 기본 검색 실행하여 초기 데이터 표시
+    const results = data.filter(item => selectedMedias.includes(item.media))
+    setFilteredKeywords(results)
+    
+    // 기간별 요약 정보 계산
+    const summary = calculateKeywordPeriodSummary(results)
+    setPeriodSummary(summary)
+  }, [])
 
   return (
     <div className="content-area">
@@ -787,7 +1253,7 @@ function DailyDataContent() {
               gap: '15px',
               flexWrap: 'wrap' 
             }}>
-              {['네이버', '카카오', '구글', '메타'].map(media => (
+              {['네이버', '카카오', '구글', '메타', '틱톡'].map(media => (
                 <label key={media} style={{ 
                   display: 'flex', 
                   alignItems: 'center',
@@ -807,54 +1273,35 @@ function DailyDataContent() {
             </div>
           </div>
 
-          {/* 기간 설정 */}
-          <div style={{ flex: '1' }}>
+          {/* 조회 날짜 */}
+          <div style={{ minWidth: '160px' }}>
             <label style={{ 
               display: 'block', 
               marginBottom: '8px', 
               fontWeight: '600',
               color: '#495057'
-            }}>기간 설정</label>
+            }}>조회 날짜</label>
             <div style={{ 
               display: 'flex', 
-              gap: '15px',
               alignItems: 'center'
             }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>시작일</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '140px'
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>종료일</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '140px'
-                  }}
-                />
-              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{
+                  padding: '6px 8px',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  fontSize: '0.9rem',
+                  width: '140px'
+                }}
+              />
             </div>
           </div>
           
           {/* 키워드 필터링 */}
-          <div style={{ flex: '1', position: 'relative' }}>
+          <div style={{ flex: '2' }}>
             <label style={{ 
               display: 'block', 
               marginBottom: '8px', 
@@ -865,57 +1312,114 @@ function DailyDataContent() {
               display: 'flex', 
               gap: '15px',
               flexWrap: 'wrap',
-              alignItems: 'flex-end'
+              alignItems: 'center',
+              justifyContent: 'space-between'
             }}>
-              {/* 지표 선택 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>지표</label>
-                <select 
-                  value={keywordMetric}
-                  onChange={(e) => setKeywordMetric(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '100px'
-                  }}
-                >
-                  <option value="노출수">노출수</option>
-                  <option value="클릭수">클릭수</option>
-                  <option value="CPC">CPC</option>
-                  <option value="광고비">광고비</option>
-                </select>
+              <div style={{
+                display: 'flex',
+                gap: '15px',
+                alignItems: 'center'
+              }}>
+                {/* 지표 선택 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>지표</label>
+                  <select 
+                    value={keywordMetric}
+                    onChange={(e) => setKeywordMetric(e.target.value)}
+                    style={{
+                      padding: '6px 8px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      width: '100px',
+                      height: '34px'
+                    }}
+                  >
+                    <option value="클릭수">클릭수</option>
+                    <option value="CPC">CPC</option>
+                    <option value="광고비">광고비</option>
+                  </select>
+                </div>
+                
+                {/* 정렬 선택 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>정렬</label>
+                  <select 
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    style={{
+                      padding: '6px 8px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      width: '100px',
+                      height: '34px'
+                    }}
+                  >
+                    <option value="내림차순">내림차순</option>
+                    <option value="오름차순">오름차순</option>
+                  </select>
+                </div>
+                
+                {/* 개수 입력 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>개수</label>
+                  <input
+                    type="number"
+                    value={keywordCount}
+                    onChange={(e) => setKeywordCount(e.target.value)}
+                    placeholder="전체"
+                    min="1"
+                    style={{
+                      padding: '6px 8px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      width: '100px',
+                      height: '34px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
               </div>
-              
-              {/* 정렬 선택 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>정렬</label>
-                <select 
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '100px'
-                  }}
-                >
-                  <option value="내림차순">내림차순</option>
-                  <option value="오름차순">오름차순</option>
-                </select>
-              </div>
-              
-              {/* 개수 입력 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>개수</label>
+
+              {/* 검색 버튼 */}
+              <button
+                onClick={handleSearch}
+                style={{
+                  padding: '6px 16px',
+                  background: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'background 0.2s',
+                  height: '34px'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#218838'}
+                onMouseOut={(e) => e.target.style.background = '#28a745'}
+              >
+                검색
+              </button>
+            </div>
+
+            {/* CPC 선택 시 광고비 범위 입력 */}
+            {keywordMetric === 'CPC' && (
+              <div style={{ 
+                display: 'flex', 
+                gap: '15px',
+                alignItems: 'center',
+                marginTop: '10px'
+              }}>
+                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>광고비 범위</label>
                 <input
                   type="number"
-                  value={keywordCount}
-                  onChange={(e) => setKeywordCount(e.target.value)}
-                  placeholder="전체"
-                  min="1"
+                  value={costRangeMin}
+                  onChange={(e) => setCostRangeMin(e.target.value)}
+                  placeholder="최소"
+                  min="0"
                   style={{
                     padding: '6px 8px',
                     border: '1px solid #dee2e6',
@@ -924,107 +1428,323 @@ function DailyDataContent() {
                     width: '100px'
                   }}
                 />
+                <span style={{ fontSize: '0.9rem', color: '#6c757d' }}>이상</span>
+                <input
+                  type="number"
+                  value={costRangeMax}
+                  onChange={(e) => setCostRangeMax(e.target.value)}
+                  placeholder="최대"
+                  min="0"
+                  style={{
+                    padding: '6px 8px',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem',
+                    width: '100px'
+                  }}
+                />
+                <span style={{ fontSize: '0.9rem', color: '#6c757d' }}>이하</span>
               </div>
-            </div>
-
-            {/* 검색 버튼 - 우측 하단에 위치 */}
-            <div style={{ 
-              position: 'absolute', 
-              bottom: '10px', 
-              right: '10px' 
-            }}>
-              <button
-                onClick={handleSearch}
-                style={{
-                  padding: '8px 16px',
-                  background: '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.background = '#218838'}
-                onMouseOut={(e) => e.target.style.background = '#28a745'}
-              >
-                검색
-              </button>
-            </div>
+            )}
           </div>
         </div>
       </div>
       
+      {/* 기간별 합산 데이터 */}
       <div style={{ marginTop: '20px' }}>
         <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '15px',
-          marginBottom: '30px'
+          background: '#f8f9fa', 
+          padding: '20px', 
+          borderRadius: '8px',
+          border: '1px solid #e9ecef',
+          marginBottom: '20px'
         }}>
-          <div style={{ 
-            background: '#667eea', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 노출수</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              {dailyData.reduce((sum, item) => sum + item.impressions, 0).toLocaleString()}
-            </div>
-          </div>
-          <div style={{ 
-            background: '#28a745', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 클릭수</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              {dailyData.reduce((sum, item) => sum + item.clicks, 0).toLocaleString()}
-            </div>
-          </div>
-          <div style={{ 
-            background: '#ffc107', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 전환수</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              {dailyData.reduce((sum, item) => sum + item.conversions, 0).toLocaleString()}
-            </div>
-          </div>
-          <div style={{ 
-            background: '#dc3545', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 광고비</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              ₩{Math.floor(dailyData.reduce((sum, item) => sum + item.cost, 0) / 10000)}만원
+          <h3 style={{ margin: '0 0 20px 0', color: '#495057' }}>기간별 합산 데이터</h3>
+          
+          <div>
+            {/* 통합 테이블 */}
+            <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dee2e6' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: '#e9ecef' }}>
+                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '1px solid #dee2e6' }}>기간</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>광고비</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CPC</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>전환수</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CPA</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CVR</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>노출수</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>클릭수</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CTR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* 전일 vs 당일 (순서 변경) */}
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>전일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalCostYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpcYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalConversionsYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpaYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>10.0%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 0.88).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 0.92).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(Math.floor((periodSummary.totalClicks || 0) * 0.92) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 0.88), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>당일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalCostToday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpc || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalConversions || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpa || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>12.0%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalImpressions || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalClicks || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{((periodSummary.totalClicks || 0) / Math.max((periodSummary.totalImpressions || 0), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <td style={{ padding: '8px 10px', fontWeight: '600', color: '#dc3545', textAlign: 'center' }}>등락</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.costChangeRate >= 0 ? '#28a745' : '#dc3545' }}>{periodSummary.costChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.costChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.cpcChangeRate >= 0 ? '#dc3545' : '#28a745' }}>{periodSummary.cpcChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.cpcChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.conversionChangeRate >= 0 ? '#28a745' : '#dc3545' }}>{periodSummary.conversionChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.conversionChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.cpaChangeRate >= 0 ? '#dc3545' : '#28a745' }}>{periodSummary.cpaChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.cpaChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: '#28a745' }}>▲ 20.0%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: '#28a745' }}>▲ 13.6%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: '#28a745' }}>▲ 8.7%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.ctrChangeRate >= 0 ? '#28a745' : '#dc3545' }}>{periodSummary.ctrChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.ctrChangeRate || 0).toFixed(1)}%</td>
+                  </tr>
+                  
+                  {/* 이전 7일 vs 최근 7일 (순서 변경) */}
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>이전 7일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 6.8).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.avgCpc || 0) * 1.12).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 0.75).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 6.8 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 0.75), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>10.7%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 6.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 6.5).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{((periodSummary.avgCtr || 0) * 1.05).toFixed(1)}%</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>최근 7일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 7.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.avgCpc || 0) * 1.03).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 0.86).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 7.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 0.86), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>12.3%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 6.9).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 7.0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{((periodSummary.avgCtr || 0) * 1.01).toFixed(1)}%</td>
+                  </tr>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <td style={{ padding: '8px 10px', fontWeight: '600', color: '#dc3545', textAlign: 'center' }}>등락</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCost = Math.floor((periodSummary.totalCost || 0) * 7.2);
+                      const prev7DaysCost = Math.floor((periodSummary.totalCost || 0) * 6.8);
+                      const changeRate = (recent7DaysCost / prev7DaysCost * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCost = Math.floor((periodSummary.totalCost || 0) * 7.2);
+                      const prev7DaysCost = Math.floor((periodSummary.totalCost || 0) * 6.8);
+                      const changeRate = (recent7DaysCost / prev7DaysCost * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 0.95);
+                      const prev7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 1.03);
+                      const changeRate = (recent7DaysCpc / prev7DaysCpc * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 0.95);
+                      const prev7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 1.03);
+                      const changeRate = (recent7DaysCpc / prev7DaysCpc * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08);
+                      const prev7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08);
+                      const changeRate = (recent7DaysConversions / prev7DaysConversions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08);
+                      const prev7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08);
+                      const changeRate = (recent7DaysConversions / prev7DaysConversions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 7.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08), 1));
+                      const prev7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 6.8 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08), 1));
+                      const changeRate = (recent7DaysCpa / prev7DaysCpa * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 7.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08), 1));
+                      const prev7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 6.8 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08), 1));
+                      const changeRate = (recent7DaysCpa / prev7DaysCpa * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCvr = 12.3;
+                      const prev7DaysCvr = 11.8;
+                      const changeRate = (recent7DaysCvr / prev7DaysCvr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCvr = 12.3;
+                      const prev7DaysCvr = 11.8;
+                      const changeRate = (recent7DaysCvr / prev7DaysCvr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.9);
+                      const prev7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.2);
+                      const changeRate = (recent7DaysImpressions / prev7DaysImpressions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.9);
+                      const prev7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.2);
+                      const changeRate = (recent7DaysImpressions / prev7DaysImpressions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 7.0);
+                      const prev7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 6.5);
+                      const changeRate = (recent7DaysClicks / prev7DaysClicks * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 7.0);
+                      const prev7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 6.5);
+                      const changeRate = (recent7DaysClicks / prev7DaysClicks * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 7.0) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.9), 1) * 100);
+                      const prev7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 6.5) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.2), 1) * 100);
+                      const changeRate = (recent7DaysCtr / prev7DaysCtr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 7.0) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.9), 1) * 100);
+                      const prev7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 6.5) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.2), 1) * 100);
+                      const changeRate = (recent7DaysCtr / prev7DaysCtr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                  </tr>
+                  
+                  {/* 전월 vs 당월 (순서 변경) */}
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>전월</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 31.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.avgCpc || 0) * 1.05).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 3.8).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 31.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.8), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>12.6%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 32.1).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 30.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(Math.floor((periodSummary.totalClicks || 0) * 30.2) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 32.1), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>당월</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 28.5).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.avgCpc || 0) * 0.97).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 3.4).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>₩{Math.floor((periodSummary.totalCost || 0) * 28.5 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.4), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>11.3%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 29.3).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 30.1).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(Math.floor((periodSummary.totalClicks || 0) * 30.1) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 29.3), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <td style={{ padding: '8px 10px', fontWeight: '600', color: '#dc3545', textAlign: 'center' }}>등락</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCost = Math.floor((periodSummary.totalCost || 0) * 28.5);
+                      const prevMonthCost = Math.floor((periodSummary.totalCost || 0) * 31.2);
+                      const changeRate = (currentMonthCost / prevMonthCost * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCost = Math.floor((periodSummary.totalCost || 0) * 28.5);
+                      const prevMonthCost = Math.floor((periodSummary.totalCost || 0) * 31.2);
+                      const changeRate = (currentMonthCost / prevMonthCost * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 0.97);
+                      const prevMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 1.05);
+                      const changeRate = (currentMonthCpc / prevMonthCpc * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 0.97);
+                      const prevMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 1.05);
+                      const changeRate = (currentMonthCpc / prevMonthCpc * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.4);
+                      const prevMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.8);
+                      const changeRate = (currentMonthConversions / prevMonthConversions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.4);
+                      const prevMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.8);
+                      const changeRate = (currentMonthConversions / prevMonthConversions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCpa = Math.floor((periodSummary.totalCost || 0) * 28.5 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.4), 1));
+                      const prevMonthCpa = Math.floor((periodSummary.totalCost || 0) * 31.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.8), 1));
+                      const changeRate = (currentMonthCpa / prevMonthCpa * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCpa = Math.floor((periodSummary.totalCost || 0) * 28.5 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.4), 1));
+                      const prevMonthCpa = Math.floor((periodSummary.totalCost || 0) * 31.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.8), 1));
+                      const changeRate = (currentMonthCpa / prevMonthCpa * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCvr = 11.3;
+                      const prevMonthCvr = 12.6;
+                      const changeRate = (currentMonthCvr / prevMonthCvr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCvr = 11.3;
+                      const prevMonthCvr = 12.6;
+                      const changeRate = (currentMonthCvr / prevMonthCvr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 29.3);
+                      const prevMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 32.1);
+                      const changeRate = (currentMonthImpressions / prevMonthImpressions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 29.3);
+                      const prevMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 32.1);
+                      const changeRate = (currentMonthImpressions / prevMonthImpressions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.1);
+                      const prevMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.2);
+                      const changeRate = (currentMonthClicks / prevMonthClicks * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.1);
+                      const prevMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.2);
+                      const changeRate = (currentMonthClicks / prevMonthClicks * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.1) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 29.3), 1) * 100);
+                      const prevMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.2) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 32.1), 1) * 100);
+                      const changeRate = (currentMonthCtr / prevMonthCtr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.1) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 29.3), 1) * 100);
+                      const prevMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.2) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 32.1), 1) * 100);
+                      const changeRate = (currentMonthCtr / prevMonthCtr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1042,14 +1762,41 @@ function DailyDataContent() {
             marginBottom: '15px' 
           }}>
             <h3 style={{ margin: 0, color: '#495057' }}>일자별 상세 데이터</h3>
-            <span style={{ 
-              fontSize: '0.9rem', 
-              color: '#6c757d',
-              fontStyle: 'italic'
-            }}>
-              일자를 클릭하면 매체별 비교가 가능합니다.
-            </span>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ 
+                fontSize: '0.9rem', 
+                color: '#6c757d',
+                fontStyle: 'italic',
+                display: 'block'
+              }}>
+                일자를 클릭하면 매체별 비교가 가능합니다.
+              </span>
+              <span style={{ 
+                fontSize: '0.8rem', 
+                color: '#6c757d',
+                fontWeight: '600'
+              }}>
+                총 {filteredDailyData.length}일 데이터
+              </span>
+            </div>
           </div>
+          
+          {filteredDailyData.length === 0 ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px',
+              color: '#6c757d',
+              background: 'white',
+              borderRadius: '6px',
+              border: '1px dashed #dee2e6'
+            }}>
+              <div style={{ fontSize: '2rem', marginBottom: '10px' }}>📅</div>
+              <h4 style={{ margin: '0 0 8px 0', color: '#495057' }}>선택한 기간에 데이터가 없습니다</h4>
+              <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                다른 기간을 선택해주세요.
+              </p>
+            </div>
+          ) : (
           
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1064,7 +1811,7 @@ function DailyDataContent() {
                 </tr>
               </thead>
               <tbody onClick={handleOutsideClick}>
-                {dailyData.slice(0, 15).map((item, index) => {
+                {filteredDailyData.map((item, index) => {
                   const isEvenRow = index % 2 === 0
                   const backgroundColor = isEvenRow ? 'white' : '#f8f9fa'
                   
@@ -1096,7 +1843,7 @@ function DailyDataContent() {
                           {item.clicks.toLocaleString()}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
-                          {item.impressions > 0 ? ((item.clicks / item.impressions) * 100).toFixed(2) + '%' : '0.00%'}
+                          {item.impressions > 0 ? ((item.clicks / item.impressions) * 100).toFixed(1) + '%' : '0.0%'}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
                           {item.cpc.toLocaleString()}
@@ -1145,7 +1892,7 @@ function DailyDataContent() {
                               borderBottom: '1px solid #dee2e6',
                               color: '#6c757d'
                             }}>
-                              {mediaItem.ctr}%
+                              {mediaItem.ctr.toFixed(1)}%
                             </td>
                             <td style={{ 
                               padding: '8px 12px', 
@@ -1172,6 +1919,7 @@ function DailyDataContent() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
       </div>
@@ -1182,25 +1930,84 @@ function DailyDataContent() {
 function KeywordDataContent() {
   const { selectedAdvertiser } = useAuth()
   
-  // 당월 1일과 당일 계산
+  // 어제 날짜 계산 (로컬 시간 기준)
   const today = new Date()
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  
+  // 로컬 시간 기준으로 YYYY-MM-DD 형식 변환
+  const formatLocalDate = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
   
   // 필터 상태 관리
-  const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타'])
+  const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타', '틱톡'])
   const [keywordMetric, setKeywordMetric] = useState('광고비')
   const [sortOrder, setSortOrder] = useState('내림차순')
   const [keywordCount, setKeywordCount] = useState('')
-  const [startDate, setStartDate] = useState(firstDayOfMonth.toISOString().split('T')[0])
-  const [endDate, setEndDate] = useState(today.toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(formatLocalDate(yesterday))
+  const [costRangeMin, setCostRangeMin] = useState('')
+  const [costRangeMax, setCostRangeMax] = useState('')
   
   // 검색 결과 상태 관리
   const [filteredKeywords, setFilteredKeywords] = useState([])
   const [keywordData, setKeywordData] = useState([])
+  const [periodSummary, setPeriodSummary] = useState({
+    totalCostToday: 0,
+    totalCostYesterday: 0,
+    totalCost7Days: 0,
+    totalCostPrev7Days: 0,
+    totalCostCurrentMonth: 0,
+    totalCostPrevMonth: 0,
+    avgCpcToday: 0,
+    avgCpcYesterday: 0,
+    avgCpc7Days: 0,
+    avgCpcPrev7Days: 0,
+    avgCpcCurrentMonth: 0,
+    avgCpcPrevMonth: 0,
+    totalConversionsToday: 0,
+    totalConversionsYesterday: 0,
+    totalConversions7Days: 0,
+    totalConversionsPrev7Days: 0,
+    totalConversionsCurrentMonth: 0,
+    totalConversionsPrevMonth: 0,
+    avgCpaToday: 0,
+    avgCpaYesterday: 0,
+    avgCpa7Days: 0,
+    avgCpaPrev7Days: 0,
+    avgCpaCurrentMonth: 0,
+    avgCpaPrevMonth: 0
+  })
   
   // 키워드 행 선택 및 슬라이드 상태 관리
   const [selectedKeywordIndex, setSelectedKeywordIndex] = useState(null)
   const [expandedKeywordData, setExpandedKeywordData] = useState([])
+  
+  // 상세 데이터 필터 및 페이지네이션 상태
+  const [selectedDataFilters, setSelectedDataFilters] = useState(['광고비', 'CPC'])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [horizontalScrollPosition, setHorizontalScrollPosition] = useState(0)
+  
+  // 스크롤바 동기화를 위한 ref
+  const topScrollRef = useRef(null)
+  const tableScrollRef = useRef(null)
+  
+  // 상단 스크롤바와 테이블 스크롤 동기화
+  const handleTopScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft
+    }
+  }
+  
+  const handleTableScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft
+    }
+  }
   
   if (!selectedAdvertiser) {
     return (
@@ -1211,7 +2018,7 @@ function KeywordDataContent() {
         minHeight: '400px' 
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🔍</div>
+          <div style={{ fontSize: '4rem', marginBottom: '20px' }}></div>
           <h3 style={{ 
             fontSize: '1.5rem', 
             fontWeight: '600', 
@@ -1247,6 +2054,10 @@ function KeywordDataContent() {
   const handleSearch = () => {
     const results = getFilteredKeywords()
     setFilteredKeywords(results)
+    
+    // 기간별 요약 정보 계산
+    const summary = calculateKeywordPeriodSummary(results)
+    setPeriodSummary(summary)
   }
 
   // 키워드 행 클릭 처리
@@ -1258,20 +2069,20 @@ function KeywordDataContent() {
       setSelectedKeywordIndex(index)
       
       // 해당 키워드의 매체별 데이터 생성
-      const mediaData = ['네이버', '카카오', '구글', '메타'].map(media => ({
+      const mediaData = ['네이버', '카카오', '구글', '메타', '틱톡'].map(media => ({
         media,
         keyword,
         campaign: `${media} ${keyword} 캠페인`,
         adGroup: `${media} ${keyword} 광고그룹`,
         impressions: Math.floor(Math.random() * 10000) + 1000,
         clicks: Math.floor(Math.random() * 500) + 50,
-        ctr: ((Math.random() * 5) + 1).toFixed(2),
+        ctr: parseFloat(((Math.random() * 5) + 1).toFixed(1)),
         cpc_today: Math.floor(Math.random() * 1000) + 100,
         cpc_yesterday: Math.floor(Math.random() * 1000) + 100,
         cpc_7days: Math.floor(Math.random() * 1000) + 100,
         cpc_last_week: Math.floor(Math.random() * 1000) + 100,
-        cost_today: Math.floor(Math.random() * 100000) + 10000,
-        cost_yesterday: Math.floor(Math.random() * 100000) + 10000,
+        cost_today: Math.floor(Math.random() * 200000) + 100000,
+        cost_yesterday: Math.floor(Math.random() * 200000) + 100000,
         cost_7days: Math.floor(Math.random() * 700000) + 70000,
         cost_last_week: Math.floor(Math.random() * 700000) + 70000
       }))
@@ -1304,47 +2115,77 @@ function KeywordDataContent() {
     return data
   }
 
-  // 키워드 데이터 생성
+  // 컴포넌트 마운트 시 데이터 생성
+  useEffect(() => {
+    // 기본 데이터 생성 (페이지 진입 시 바로 표시)
+    const data = generateKeywordData()
+    setKeywordData(data)
+    
+    // 기본 검색 실행하여 초기 데이터 표시
+    const results = data.filter(item => selectedMedias.includes(item.media))
+    setFilteredKeywords(results)
+    
+    // 기간별 요약 정보 계산
+    const summary = calculateKeywordPeriodSummary(results)
+    setPeriodSummary(summary)
+  }, [])
+
+  // 키워드 고정 더미 데이터 생성
   const generateKeywordData = () => {
-    const keywords = [
-      '브랜드명', '제품명', '카테고리', '경쟁사', '일반키워드', 
-      '롱테일키워드', '상품후기', '가격비교', '이벤트', '할인',
-      '신제품', '인기상품', '추천', '베스트', '특가', '리뷰',
-      '사용법', '구매', '배송', '무료', '추천템', '인기템',
-      '베스트셀러', '할인가', '특가상품', '이벤트상품'
+    const fixedKeywordData = [
+      { keyword: '브랜드명', media: '네이버', campaign: '네이버 브랜드 캠페인', adGroup: '네이버 브랜드 키워드', impressions: 15000, clicks: 750, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 130000, cost_yesterday: 128000, cost_7days: 320000, cost_last_week: 325000 },
+              { keyword: '브랜드명', media: '구글', campaign: '구글 브랜드 캠페인', adGroup: '구글 브랜드 키워드', impressions: 12000, clicks: 600, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 120000, cost_yesterday: 118000, cost_7days: 280000, cost_last_week: 285000 },
+              { keyword: '브랜드명', media: '카카오', campaign: '카카오 브랜드 캠페인', adGroup: '카카오 브랜드 키워드', impressions: 10000, clicks: 500, ctr: 5.0, cpc_today: 380, cpc_yesterday: 375, cpc_7days: 378, cpc_last_week: 382, cost_today: 110000, cost_yesterday: 108000, cost_7days: 240000, cost_last_week: 245000 },
+        { keyword: '브랜드명', media: '메타', campaign: '메타 브랜드 캠페인', adGroup: '메타 브랜드 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 400, cpc_yesterday: 395, cpc_7days: 398, cpc_last_week: 402, cost_today: 100000, cost_yesterday: 108000, cost_7days: 200000, cost_last_week: 205000 },
+      { keyword: '브랜드명', media: '틱톡', campaign: '틱톡 브랜드 캠페인', adGroup: '틱톡 브랜드 키워드', impressions: 50000, clicks: 2500, ctr: 5.0, cpc_today: 180, cpc_yesterday: 175, cpc_7days: 178, cpc_last_week: 182, cost_today: 150000, cost_yesterday: 148000, cost_7days: 600000, cost_last_week: 605000 },
+      
+      { keyword: '제품명', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 18000, clicks: 900, ctr: 5.0, cpc_today: 280, cpc_yesterday: 275, cpc_7days: 278, cpc_last_week: 282, cost_today: 95000, cost_yesterday: 92000, cost_7days: 380000, cost_last_week: 385000 },
+      { keyword: '제품명', media: '카카오', campaign: '카카오 제품 캠페인', adGroup: '카카오 제품 키워드', impressions: 14000, clicks: 700, ctr: 5.0, cpc_today: 300, cpc_yesterday: 295, cpc_7days: 298, cpc_last_week: 302, cost_today: 75000, cost_yesterday: 73000, cost_7days: 300000, cost_last_week: 305000 },
+      { keyword: '제품명', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 68000, cost_yesterday: 66000, cost_7days: 270000, cost_last_week: 275000 },
+      { keyword: '제품명', media: '메타', campaign: '메타 제품 캠페인', adGroup: '메타 제품 키워드', impressions: 9000, clicks: 450, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 55000, cost_yesterday: 53000, cost_7days: 220000, cost_last_week: 225000 },
+      { keyword: '제품명', media: '틱톡', campaign: '틱톡 제품 캠페인', adGroup: '틱톡 제품 키워드', impressions: 45000, clicks: 2250, ctr: 5.0, cpc_today: 200, cpc_yesterday: 195, cpc_7days: 198, cpc_last_week: 202, cost_today: 140000, cost_yesterday: 138000, cost_7days: 560000, cost_last_week: 565000 },
+      
+      { keyword: '카테고리', media: '구글', campaign: '구글 카테고리 캠페인', adGroup: '구글 핵심 키워드', impressions: 20000, clicks: 1000, ctr: 5.0, cpc_today: 250, cpc_yesterday: 245, cpc_7days: 248, cpc_last_week: 252, cost_today: 100000, cost_yesterday: 98000, cost_7days: 400000, cost_last_week: 405000 },
+      { keyword: '카테고리', media: '메타', campaign: '메타 카테고리 캠페인', adGroup: '메타 핵심 키워드', impressions: 16000, clicks: 800, ctr: 5.0, cpc_today: 275, cpc_yesterday: 270, cpc_7days: 273, cpc_last_week: 277, cost_today: 85000, cost_yesterday: 83000, cost_7days: 340000, cost_last_week: 345000 },
+      { keyword: '카테고리', media: '네이버', campaign: '네이버 카테고리 캠페인', adGroup: '네이버 핵심 키워드', impressions: 13000, clicks: 650, ctr: 5.0, cpc_today: 290, cpc_yesterday: 285, cpc_7days: 288, cpc_last_week: 292, cost_today: 72000, cost_yesterday: 70000, cost_7days: 290000, cost_last_week: 295000 },
+      { keyword: '카테고리', media: '카카오', campaign: '카카오 카테고리 캠페인', adGroup: '카카오 핵심 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 310, cpc_yesterday: 305, cpc_7days: 308, cpc_last_week: 312, cost_today: 64000, cost_yesterday: 62000, cost_7days: 250000, cost_last_week: 255000 },
+      { keyword: '카테고리', media: '틱톡', campaign: '틱톡 카테고리 캠페인', adGroup: '틱톡 카테고리 키워드', impressions: 40000, clicks: 2000, ctr: 5.0, cpc_today: 170, cpc_yesterday: 165, cpc_7days: 168, cpc_last_week: 172, cost_today: 130000, cost_yesterday: 128000, cost_7days: 520000, cost_last_week: 525000 },
+      
+      { keyword: '경쟁사', media: '네이버', campaign: '네이버 브랜드 캠페인', adGroup: '네이버 브랜드 키워드', impressions: 10000, clicks: 500, ctr: 5.0, cpc_today: 400, cpc_yesterday: 395, cpc_7days: 398, cpc_last_week: 402, cost_today: 65000, cost_yesterday: 63000, cost_7days: 260000, cost_last_week: 265000 },
+      { keyword: '경쟁사', media: '구글', campaign: '구글 브랜드 캠페인', adGroup: '구글 브랜드 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 420, cpc_yesterday: 415, cpc_7days: 418, cpc_last_week: 422, cost_today: 58000, cost_yesterday: 56000, cost_7days: 230000, cost_last_week: 235000 },
+      
+      { keyword: '일반키워드', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 22000, clicks: 1100, ctr: 5.0, cpc_today: 230, cpc_yesterday: 225, cpc_7days: 228, cpc_last_week: 232, cost_today: 110000, cost_yesterday: 108000, cost_7days: 440000, cost_last_week: 445000 },
+      { keyword: '일반키워드', media: '카카오', campaign: '카카오 제품 캠페인', adGroup: '카카오 제품 키워드', impressions: 13000, clicks: 650, ctr: 5.0, cpc_today: 260, cpc_yesterday: 255, cpc_7days: 258, cpc_last_week: 262, cost_today: 72000, cost_yesterday: 70000, cost_7days: 290000, cost_last_week: 295000 },
+      
+      { keyword: '롱테일키워드', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 55000, cost_yesterday: 53000, cost_7days: 220000, cost_last_week: 225000 },
+      
+      { keyword: '상품후기', media: '메타', campaign: '메타 브랜드 캠페인', adGroup: '메타 브랜드 키워드', impressions: 12000, clicks: 600, ctr: 5.0, cpc_today: 300, cpc_yesterday: 295, cpc_7days: 298, cpc_last_week: 302, cost_today: 68000, cost_yesterday: 66000, cost_7days: 270000, cost_last_week: 275000 },
+      
+      { keyword: '가격비교', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 17000, clicks: 850, ctr: 5.0, cpc_today: 290, cpc_yesterday: 285, cpc_7days: 288, cpc_last_week: 292, cost_today: 88000, cost_yesterday: 86000, cost_7days: 350000, cost_last_week: 355000 },
+      { keyword: '가격비교', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 64000, cost_yesterday: 62000, cost_7days: 250000, cost_last_week: 255000 },
+      
+      { keyword: '이벤트', media: '카카오', campaign: '카카오 카테고리 캠페인', adGroup: '카카오 핵심 키워드', impressions: 25000, clicks: 1250, ctr: 5.0, cpc_today: 200, cpc_yesterday: 195, cpc_7days: 198, cpc_last_week: 202, cost_today: 120000, cost_yesterday: 118000, cost_7days: 480000, cost_last_week: 485000 },
+      
+      { keyword: '할인', media: '메타', campaign: '메타 제품 캠페인', adGroup: '메타 제품 키워드', impressions: 19000, clicks: 950, ctr: 5.0, cpc_today: 260, cpc_yesterday: 255, cpc_7days: 258, cpc_last_week: 262, cost_today: 95000, cost_yesterday: 93000, cost_7days: 380000, cost_last_week: 385000 },
+      
+      // 틱톡 전용 키워드 데이터 추가
+      { keyword: '챌린지', media: '틱톡', campaign: '틱톡 바이럴 챌린지', adGroup: '틱톡 해시태그 키워드', impressions: 80000, clicks: 4000, ctr: 5.0, cpc_today: 150, cpc_yesterday: 145, cpc_7days: 148, cpc_last_week: 152, cost_today: 200000, cost_yesterday: 198000, cost_7days: 800000, cost_last_week: 805000 },
+      { keyword: '댄스', media: '틱톡', campaign: '틱톡 댄스 챌린지', adGroup: '틱톡 댄스 키워드', impressions: 75000, clicks: 3750, ctr: 5.0, cpc_today: 160, cpc_yesterday: 155, cpc_7days: 158, cpc_last_week: 162, cost_today: 180000, cost_yesterday: 178000, cost_7days: 720000, cost_last_week: 725000 },
+      { keyword: '트렌드', media: '틱톡', campaign: '틱톡 트렌드 마케팅', adGroup: '틱톡 트렌드 키워드', impressions: 60000, clicks: 3000, ctr: 5.0, cpc_today: 190, cpc_yesterday: 185, cpc_7days: 188, cpc_last_week: 192, cost_today: 170000, cost_yesterday: 168000, cost_7days: 680000, cost_last_week: 685000 },
+      { keyword: '바이럴', media: '틱톡', campaign: '틱톡 바이럴 마케팅', adGroup: '틱톡 바이럴 키워드', impressions: 65000, clicks: 3250, ctr: 5.0, cpc_today: 175, cpc_yesterday: 170, cpc_7days: 173, cpc_last_week: 177, cost_today: 160000, cost_yesterday: 158000, cost_7days: 640000, cost_last_week: 645000 },
+      { keyword: '인플루언서', media: '틱톡', campaign: '틱톡 인플루언서 콜라보', adGroup: '틱톡 인플루언서 키워드', impressions: 55000, clicks: 2750, ctr: 5.0, cpc_today: 210, cpc_yesterday: 205, cpc_7days: 208, cpc_last_week: 212, cost_today: 190000, cost_yesterday: 188000, cost_7days: 760000, cost_last_week: 765000 }
     ]
     
-    const medias = ['네이버', '카카오', '구글', '메타']
-    const campaigns = ['브랜드 캠페인', '제품 캠페인', '카테고리 캠페인']
-    const adGroups = ['핵심 키워드', '브랜드 키워드', '제품 키워드']
-    
-    const data = []
-    keywords.forEach(keyword => {
-      medias.forEach(media => {
-        const randomCampaign = campaigns[Math.floor(Math.random() * campaigns.length)]
-        const randomAdGroup = adGroups[Math.floor(Math.random() * adGroups.length)]
-        
-        data.push({
-          keyword,
-          media,
-          campaign: `${media} ${randomCampaign}`,
-          adGroup: `${media} ${randomAdGroup}`,
-          impressions: Math.floor(Math.random() * 10000) + 1000,
-          clicks: Math.floor(Math.random() * 500) + 50,
-          ctr: ((Math.random() * 5) + 1).toFixed(2),
-          cpc_today: Math.floor(Math.random() * 1000) + 100,
-          cpc_yesterday: Math.floor(Math.random() * 1000) + 100,
-          cpc_7days: Math.floor(Math.random() * 1000) + 100,
-          cpc_last_week: Math.floor(Math.random() * 1000) + 100,
-          cost_today: Math.floor(Math.random() * 100000) + 10000,
-          cost_yesterday: Math.floor(Math.random() * 100000) + 10000,
-          cost_7days: Math.floor(Math.random() * 700000) + 70000,
-          cost_last_week: Math.floor(Math.random() * 700000) + 70000
-        })
-      })
-    })
-    
-    return data
+    // 모든 키워드 데이터의 광고비가 0원이 되지 않도록 하고, 전환수를 적절히 설정
+    return fixedKeywordData.map(item => ({
+      ...item,
+      cost_today: Math.max(50000, item.cost_today),
+      cost_yesterday: Math.max(50000, item.cost_yesterday),
+      cost_7days: Math.max(50000, item.cost_7days),
+      cost_last_week: Math.max(50000, item.cost_last_week),
+      // 전환수는 클릭수의 8%로 설정하되 1,000개 미만으로 제한
+      conversions: Math.min(999, Math.floor(item.clicks * 0.08))
+    }))
   }
 
   // 키워드 데이터 필터링 및 정렬
@@ -1389,6 +2230,16 @@ function KeywordDataContent() {
     // 그룹화된 데이터를 배열로 변환
     let result = Object.values(groupedByKeyword)
     
+    // CPC 선택 시 광고비 범위 필터링
+    if (keywordMetric === 'CPC') {
+      if (costRangeMin && !isNaN(costRangeMin)) {
+        result = result.filter(item => item.cost_today >= parseInt(costRangeMin))
+      }
+      if (costRangeMax && !isNaN(costRangeMax)) {
+        result = result.filter(item => item.cost_today <= parseInt(costRangeMax))
+      }
+    }
+    
     // 정렬 기준에 따라 정렬
     if (keywordMetric === '광고비') {
       result.sort((a, b) => {
@@ -1396,13 +2247,13 @@ function KeywordDataContent() {
         const bValue = b.cost_today + b.cost_yesterday + b.cost_7days + b.cost_last_week
         return sortOrder === '내림차순' ? bValue - aValue : aValue - bValue
       })
-    } else if (keywordMetric === '노출수') {
-      result.sort((a, b) => {
-        return sortOrder === '내림차순' ? b.impressions - a.impressions : a.impressions - b.impressions
-      })
     } else if (keywordMetric === '클릭수') {
       result.sort((a, b) => {
         return sortOrder === '내림차순' ? b.clicks - a.clicks : a.clicks - b.clicks
+      })
+    } else if (keywordMetric === 'CPC') {
+      result.sort((a, b) => {
+        return sortOrder === '내림차순' ? b.cpc_today - a.cpc_today : a.cpc_today - b.cpc_today
       })
     }
     
@@ -1416,34 +2267,202 @@ function KeywordDataContent() {
 
   // 컴포넌트 마운트 시 데이터 생성
   useEffect(() => {
+    // 기본 데이터 생성 (페이지 진입 시 바로 표시)
     const data = generateKeywordData()
     setKeywordData(data)
+    
+    // 기본 검색 실행하여 초기 데이터 표시
+    const results = data.filter(item => selectedMedias.includes(item.media))
+    setFilteredKeywords(results)
+    
+    // 기간별 요약 정보 계산
+    const summary = calculateKeywordPeriodSummary(results)
+    setPeriodSummary(summary)
   }, [])
 
-  // 검색 결과 초기화
-  useEffect(() => {
-    if (keywordData.length > 0) {
-      const results = getFilteredKeywords()
-      setFilteredKeywords(results)
+  // 키워드 데이터용 기간별 합산 정보 계산
+  const calculateKeywordPeriodSummary = (data) => {
+    if (!data || data.length === 0) {
+      const defaultData = {
+        totalImpressions: 320000,
+        totalClicks: 16000,
+        totalCost: 2400000,  // 기본값에 totalCost 추가
+        totalCostToday: 2400000,
+        totalCostYesterday: 2208000,
+        totalCost7Days: 16800000,
+        totalCostLastWeek: 15840000,
+        avgCtr: 5.0,
+        avgCpc: 150,
+        avgCpa: 1250
+      }
+      
+      return {
+        ...defaultData,
+        totalConversions: Math.floor(defaultData.totalClicks * 0.12),
+        totalConversionsYesterday: Math.floor(defaultData.totalClicks * 0.10),
+        avgCtrYesterday: parseFloat((defaultData.avgCtr * 0.96).toFixed(1)),
+        avgCpcYesterday: Math.floor(defaultData.avgCpc * 1.08),
+        avgCpaYesterday: Math.floor(defaultData.avgCpa * 1.12),
+        // 등락률
+        costChangeRate: 8.7,
+        cpcChangeRate: -7.4,
+        conversionChangeRate: 20.0,
+        cpaChangeRate: -10.7,
+        ctrChangeRate: 4.2
+      }
     }
-  }, [selectedMedias, keywordMetric, sortOrder, keywordCount, keywordData])
-
-  // 카드 데이터 계산
-  const calculateCardData = () => {
-    const totalImpressions = filteredKeywords.reduce((sum, item) => sum + item.impressions, 0)
-    const totalClicks = filteredKeywords.reduce((sum, item) => sum + item.clicks, 0)
-    const totalConversions = Math.floor(totalClicks * 0.05) // 5% 전환율 가정
-    const totalCost = filteredKeywords.reduce((sum, item) => sum + item.cost_today, 0)
+    
+    const totalImpressions = data.reduce((sum, item) => sum + item.impressions, 0)
+    const totalClicks = data.reduce((sum, item) => sum + item.clicks, 0)
+    const totalCostToday = data.reduce((sum, item) => sum + item.cost_today, 0)
+    const totalCostYesterday = data.reduce((sum, item) => sum + item.cost_yesterday, 0)
+    const totalCost7Days = data.reduce((sum, item) => sum + item.cost_7days, 0)
+    const totalCostLastWeek = data.reduce((sum, item) => sum + item.cost_last_week, 0)
+    
+    const totalConversions = Math.floor(totalClicks * 0.12) // 전환수는 클릭수의 12%로 가정
+    const totalConversionsYesterday = Math.floor(totalClicks * 0.10) // 어제는 10%로 가정
+    
+    // 평균 CTR 계산 (전체 클릭수 / 전체 노출수)
+    const avgCtr = totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(1)) : 0
+    const avgCtrYesterday = totalImpressions > 0 ? parseFloat(((totalClicks * 0.96 / totalImpressions) * 100).toFixed(1)) : 0
+    
+    // 평균 CPC 계산 (전체 광고비 / 전체 클릭수)
+    const avgCpc = totalClicks > 0 ? Math.round(totalCostToday / totalClicks) : 0
+    const avgCpcYesterday = totalClicks > 0 ? Math.round(totalCostYesterday / totalClicks) : 0
+    
+    // 평균 CPA 계산 (전체 광고비 / 전체 전환수)
+    const avgCpa = totalConversions > 0 ? Math.round(totalCostToday / totalConversions) : 0
+    const avgCpaYesterday = totalConversionsYesterday > 0 ? Math.round(totalCostYesterday / totalConversionsYesterday) : 0
+    
+    // 실제 등락률 계산
+    const costChangeRate = totalCostYesterday > 0 ? ((totalCostToday - totalCostYesterday) / totalCostYesterday * 100) : 0
+    const cpcChangeRate = avgCpcYesterday > 0 ? ((avgCpc - avgCpcYesterday) / avgCpcYesterday * 100) : 0
+    const conversionChangeRate = totalConversionsYesterday > 0 ? ((totalConversions - totalConversionsYesterday) / totalConversionsYesterday * 100) : 0
+    const cpaChangeRate = avgCpaYesterday > 0 ? ((avgCpa - avgCpaYesterday) / avgCpaYesterday * 100) : 0
+    const ctrChangeRate = avgCtrYesterday > 0 ? ((avgCtr - avgCtrYesterday) / avgCtrYesterday * 100) : 0
     
     return {
       totalImpressions,
       totalClicks,
+      totalCost: totalCostToday,  // totalCost 필드 추가
+      totalCostToday,
+      totalCostYesterday,
+      totalCost7Days,
+      totalCostLastWeek,
       totalConversions,
-      totalCost
+      totalConversionsYesterday,
+      avgCtr,
+      avgCtrYesterday,
+      avgCpc,
+      avgCpcYesterday,
+      avgCpa,
+      avgCpaYesterday,
+      costChangeRate,
+      cpcChangeRate,
+      conversionChangeRate,
+      cpaChangeRate,
+      ctrChangeRate
     }
   }
 
-  const cardData = calculateCardData()
+  // 상세 데이터 테이블 컬럼 정의
+  const getDetailedColumns = () => {
+    const allColumns = [
+      { key: 'media', title: '매체', group: 'basic', width: '80px' },
+      { key: 'keyword', title: '키워드(소재)', group: 'basic', width: '120px' },
+      { key: 'cost_today', title: '당일(광고비)', group: '광고비', width: '100px' },
+      { key: 'cost_yesterday', title: '전일(광고비)', group: '광고비', width: '100px' },
+      { key: 'cost_7days', title: '최근 7일(광고비)', group: '광고비', width: '110px' },
+      { key: 'cost_prev7days', title: '이전 7일(광고비)', group: '광고비', width: '110px' },
+      { key: 'cost_currentMonth', title: '당월(광고비)', group: '광고비', width: '100px' },
+      { key: 'cost_prevMonth', title: '전월(광고비)', group: '광고비', width: '100px' },
+      { key: 'cpc_today', title: '당일(CPC)', group: 'CPC', width: '90px' },
+      { key: 'cpc_yesterday', title: '전일(CPC)', group: 'CPC', width: '90px' },
+      { key: 'cpc_7days', title: '최근 7일(CPC)', group: 'CPC', width: '100px' },
+      { key: 'cpc_prev7days', title: '이전 7일(CPC)', group: 'CPC', width: '100px' },
+      { key: 'cpc_currentMonth', title: '당월(CPC)', group: 'CPC', width: '90px' },
+      { key: 'cpc_prevMonth', title: '전월(CPC)', group: 'CPC', width: '90px' },
+      { key: 'conversions_today', title: '당일(전환수)', group: '전환수', width: '90px' },
+      { key: 'conversions_yesterday', title: '전일(전환수)', group: '전환수', width: '90px' },
+      { key: 'conversions_7days', title: '최근 7일(전환수)', group: '전환수', width: '110px' },
+      { key: 'conversions_prev7days', title: '이전 7일(전환수)', group: '전환수', width: '110px' },
+      { key: 'conversions_currentMonth', title: '당월(전환수)', group: '전환수', width: '90px' },
+      { key: 'conversions_prevMonth', title: '전월(전환수)', group: '전환수', width: '90px' },
+      { key: 'cpa_today', title: '당일(CPA)', group: 'CPA', width: '90px' },
+      { key: 'cpa_yesterday', title: '전일(CPA)', group: 'CPA', width: '90px' },
+      { key: 'cpa_7days', title: '최근 7일(CPA)', group: 'CPA', width: '100px' },
+      { key: 'cpa_prev7days', title: '이전 7일(CPA)', group: 'CPA', width: '100px' },
+      { key: 'cpa_currentMonth', title: '당월(CPA)', group: 'CPA', width: '90px' },
+      { key: 'cpa_prevMonth', title: '전월(CPA)', group: 'CPA', width: '90px' },
+      { key: 'cvr', title: 'CVR', group: '기타', width: '70px' },
+      { key: 'campaign', title: '캠페인', group: '기타', width: '120px' },
+      { key: 'adGroup', title: '광고그룹', group: '기타', width: '120px' },
+      { key: 'impressions', title: '노출수', group: '기타', width: '90px' },
+      { key: 'clicks', title: '클릭수', group: '기타', width: '80px' },
+      { key: 'ctr', title: 'CTR', group: '기타', width: '70px' }
+    ]
+
+    // 선택된 필터에 따라 컬럼 필터링
+    const filteredColumns = allColumns.filter(col => 
+      col.group === 'basic' || selectedDataFilters.includes(col.group)
+    )
+
+    return filteredColumns // 모든 컬럼 표시
+  }
+
+  // 확장된 키워드 데이터 생성 (새로운 컬럼 구조에 맞게)
+  const generateExpandedKeywordData = (item) => {
+    return {
+      ...item,
+      cost_prev7days: Math.floor(item.cost_7days * 0.92),
+      cost_currentMonth: Math.floor(item.cost_today * 25),
+      cost_prevMonth: Math.floor(item.cost_today * 28),
+      cpc_prev7days: Math.floor(item.cpc_7days * 1.05),
+      cpc_currentMonth: Math.floor(item.cpc_today * 0.98),
+      cpc_prevMonth: Math.floor(item.cpc_today * 1.06),
+      conversions_today: Math.floor(item.clicks * 0.08),
+      conversions_yesterday: Math.floor(item.clicks * 0.07),
+      conversions_7days: Math.floor(item.clicks * 0.56),
+      conversions_prev7days: Math.floor(item.clicks * 0.52),
+      conversions_currentMonth: Math.floor(item.clicks * 2.4),
+      conversions_prevMonth: Math.floor(item.clicks * 2.2),
+      cpa_today: Math.floor(item.cost_today / Math.max(Math.floor(item.clicks * 0.08), 1)),
+      cpa_yesterday: Math.floor(item.cost_yesterday / Math.max(Math.floor(item.clicks * 0.07), 1)),
+      cpa_7days: Math.floor(item.cost_7days / Math.max(Math.floor(item.clicks * 0.56), 1)),
+      cpa_prev7days: Math.floor((item.cost_7days * 0.92) / Math.max(Math.floor(item.clicks * 0.52), 1)),
+      cpa_currentMonth: Math.floor((item.cost_today * 25) / Math.max(Math.floor(item.clicks * 2.4), 1)),
+      cpa_prevMonth: Math.floor((item.cost_today * 28) / Math.max(Math.floor(item.clicks * 2.2), 1)),
+      cvr: ((Math.floor(item.clicks * 0.08) / item.clicks) * 100).toFixed(1) + '%'
+    }
+  }
+
+  // 페이지네이션된 데이터 반환
+  const getPaginatedData = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredKeywords.slice(startIndex, endIndex).map(generateExpandedKeywordData)
+  }
+
+  // 총 페이지 수 계산
+  const getTotalPages = () => {
+    return Math.ceil(filteredKeywords.length / itemsPerPage)
+  }
+
+  // 페이지 변경 핸들러
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+  }
+
+  // 필터 변경 핸들러
+  const handleFilterChange = (filter) => {
+    setSelectedDataFilters(prev => {
+      if (prev.includes(filter)) {
+        return prev.filter(f => f !== filter)
+      } else {
+        return [...prev, filter]
+      }
+    })
+  }
 
   return (
     <div className="content-area">
@@ -1474,7 +2493,7 @@ function KeywordDataContent() {
               gap: '15px',
               flexWrap: 'wrap' 
             }}>
-              {['네이버', '카카오', '구글', '메타'].map(media => (
+              {['네이버', '카카오', '구글', '메타', '틱톡'].map(media => (
                 <label key={media} style={{ 
                   display: 'flex', 
                   alignItems: 'center',
@@ -1494,54 +2513,35 @@ function KeywordDataContent() {
             </div>
           </div>
 
-          {/* 기간 설정 */}
-          <div style={{ flex: '1' }}>
+          {/* 조회 날짜 */}
+          <div style={{ minWidth: '160px' }}>
             <label style={{ 
               display: 'block', 
               marginBottom: '8px', 
               fontWeight: '600',
               color: '#495057'
-            }}>기간 설정</label>
+            }}>조회 날짜</label>
             <div style={{ 
               display: 'flex', 
-              gap: '15px',
               alignItems: 'center'
             }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>시작일</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '140px'
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>종료일</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '140px'
-                  }}
-                />
-              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{
+                  padding: '6px 8px',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  fontSize: '0.9rem',
+                  width: '140px'
+                }}
+              />
             </div>
           </div>
           
           {/* 키워드 필터링 */}
-          <div style={{ flex: '1', position: 'relative' }}>
+          <div style={{ flex: '2' }}>
             <label style={{ 
               display: 'block', 
               marginBottom: '8px', 
@@ -1552,57 +2552,114 @@ function KeywordDataContent() {
               display: 'flex', 
               gap: '15px',
               flexWrap: 'wrap',
-              alignItems: 'flex-end'
+              alignItems: 'center',
+              justifyContent: 'space-between'
             }}>
-              {/* 지표 선택 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>지표</label>
-                <select 
-                  value={keywordMetric} 
-                  onChange={(e) => setKeywordMetric(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '100px'
-                  }}
-                >
-                  <option value="노출수">노출수</option>
-                  <option value="클릭수">클릭수</option>
-                  <option value="CPC">CPC</option>
-                  <option value="광고비">광고비</option>
-                </select>
+              <div style={{
+                display: 'flex',
+                gap: '15px',
+                alignItems: 'center'
+              }}>
+                {/* 지표 선택 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>지표</label>
+                  <select 
+                    value={keywordMetric} 
+                    onChange={(e) => setKeywordMetric(e.target.value)}
+                    style={{
+                      padding: '6px 8px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      width: '100px',
+                      height: '34px'
+                    }}
+                  >
+                    <option value="클릭수">클릭수</option>
+                    <option value="CPC">CPC</option>
+                    <option value="광고비">광고비</option>
+                  </select>
+                </div>
+                
+                {/* 정렬 선택 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>정렬</label>
+                  <select 
+                    value={sortOrder} 
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    style={{
+                      padding: '6px 8px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      width: '100px',
+                      height: '34px'
+                    }}
+                  >
+                    <option value="내림차순">내림차순</option>
+                    <option value="오름차순">오름차순</option>
+                  </select>
+                </div>
+                
+                {/* 개수 입력 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>개수</label>
+                  <input
+                    type="number"
+                    value={keywordCount}
+                    onChange={(e) => setKeywordCount(e.target.value)}
+                    placeholder="전체"
+                    min="1"
+                    style={{
+                      padding: '6px 8px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      width: '100px',
+                      height: '34px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
               </div>
-              
-              {/* 정렬 선택 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>정렬</label>
-                <select 
-                  value={sortOrder} 
-                  onChange={(e) => setSortOrder(e.target.value)}
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '100px'
-                  }}
-                >
-                  <option value="내림차순">내림차순</option>
-                  <option value="오름차순">오름차순</option>
-                </select>
-              </div>
-              
-              {/* 개수 입력 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>개수</label>
+
+              {/* 검색 버튼 */}
+              <button
+                onClick={handleSearch}
+                style={{
+                  padding: '6px 16px',
+                  background: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'background 0.2s',
+                  height: '34px'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#218838'}
+                onMouseOut={(e) => e.target.style.background = '#28a745'}
+              >
+                검색
+              </button>
+            </div>
+
+            {/* CPC 선택 시 광고비 범위 입력 */}
+            {keywordMetric === 'CPC' && (
+              <div style={{ 
+                display: 'flex', 
+                gap: '15px',
+                alignItems: 'center',
+                marginTop: '10px'
+              }}>
+                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>광고비 범위</label>
                 <input
                   type="number"
-                  value={keywordCount}
-                  onChange={(e) => setKeywordCount(e.target.value)}
-                  placeholder="전체"
-                  min="1"
+                  value={costRangeMin}
+                  onChange={(e) => setCostRangeMin(e.target.value)}
+                  placeholder="최소"
+                  min="0"
                   style={{
                     padding: '6px 8px',
                     border: '1px solid #dee2e6',
@@ -1611,111 +2668,326 @@ function KeywordDataContent() {
                     width: '100px'
                   }}
                 />
+                <span style={{ fontSize: '0.9rem', color: '#6c757d' }}>이상</span>
+                <input
+                  type="number"
+                  value={costRangeMax}
+                  onChange={(e) => setCostRangeMax(e.target.value)}
+                  placeholder="최대"
+                  min="0"
+                  style={{
+                    padding: '6px 8px',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem',
+                    width: '100px'
+                  }}
+                />
+                <span style={{ fontSize: '0.9rem', color: '#6c757d' }}>이하</span>
               </div>
-            </div>
-
-            {/* 검색 버튼 - 우측 하단에 위치 */}
-            <div style={{ 
-              position: 'absolute', 
-              bottom: '10px', 
-              right: '10px' 
-            }}>
-              <button
-                onClick={handleSearch}
-                style={{
-                  padding: '8px 16px',
-                  background: '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.background = '#218838'}
-                onMouseOut={(e) => e.target.style.background = '#28a745'}
-              >
-                검색
-              </button>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
       <div style={{ marginTop: '20px' }}>
-        {/* 카드 영역 */}
+        {/* 기간별 합산 정보 */}
         <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '15px',
+          background: '#f8f9fa', 
+          padding: '20px', 
+          borderRadius: '8px',
+          border: '1px solid #e9ecef',
           marginBottom: '30px'
         }}>
-          <div style={{ 
-            background: '#667eea', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 노출수</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              {cardData.totalImpressions.toLocaleString()}
-            </div>
-          </div>
+          <h3 style={{ 
+            margin: '0 0 20px 0', 
+            color: '#495057'
+          }}>기간별 합산 데이터</h3>
           
-          <div style={{ 
-            background: '#28a745', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 클릭수</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              {cardData.totalClicks.toLocaleString()}
-            </div>
-          </div>
-          
-          <div style={{ 
-            background: '#ffc107', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 전환수</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              {cardData.totalConversions.toLocaleString()}
-            </div>
-          </div>
-          
-          <div style={{ 
-            background: '#dc3545', 
-            color: 'white', 
-            padding: '12px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            height: '65px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center'
-          }}>
-            <div style={{ fontSize: '0.8rem', marginBottom: '4px' }}>총 광고비</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
-              ₩{Math.floor(cardData.totalCost / 10000)}만원
+          <div>
+            {/* 통합 테이블 */}
+            <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dee2e6' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: '#e9ecef' }}>
+                    <th style={{ padding: '10px', textAlign: 'left', borderBottom: '1px solid #dee2e6' }}>기간</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>광고비</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CPC</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>전환수</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CPA</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CVR</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>노출수</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>클릭수</th>
+                    <th style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>CTR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* 전일 vs 당일 (순서 변경) */}
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>전일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalCostYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpcYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalConversionsYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpaYesterday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>10.0%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 0.88).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 0.92).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(Math.floor((periodSummary.totalClicks || 0) * 0.92) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 0.88), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>당일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalCostToday || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpc || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalConversions || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.avgCpa || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>12.0%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalImpressions || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(periodSummary.totalClicks || 0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{((periodSummary.totalClicks || 0) / Math.max((periodSummary.totalImpressions || 0), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <td style={{ padding: '8px 10px', fontWeight: '600', color: '#dc3545', textAlign: 'center' }}>등락</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.costChangeRate >= 0 ? '#28a745' : '#dc3545' }}>{periodSummary.costChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.costChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.cpcChangeRate >= 0 ? '#dc3545' : '#28a745' }}>{periodSummary.cpcChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.cpcChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.conversionChangeRate >= 0 ? '#28a745' : '#dc3545' }}>{periodSummary.conversionChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.conversionChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.cpaChangeRate >= 0 ? '#dc3545' : '#28a745' }}>{periodSummary.cpaChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.cpaChangeRate || 0).toFixed(1)}%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: '#28a745' }}>▲ 20.0%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: '#28a745' }}>▲ 13.6%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: '#28a745' }}>▲ 8.7%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: periodSummary.ctrChangeRate >= 0 ? '#28a745' : '#dc3545' }}>{periodSummary.ctrChangeRate >= 0 ? '▲' : '▼'} {Math.abs(periodSummary.ctrChangeRate || 0).toFixed(1)}%</td>
+                  </tr>
+                  
+                  {/* 이전 7일 vs 최근 7일 (순서 변경) */}
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>이전 7일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 6.8).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.avgCpc || 0) * 1.12).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 0.75).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 6.8 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 0.75), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>10.7%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 6.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 6.5).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{((periodSummary.avgCtr || 0) * 1.05).toFixed(1)}%</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>최근 7일</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 7.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.avgCpc || 0) * 1.03).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 0.86).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 7.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 0.86), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>12.3%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 6.9).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 7.0).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{((periodSummary.avgCtr || 0) * 1.01).toFixed(1)}%</td>
+                  </tr>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <td style={{ padding: '8px 10px', fontWeight: '600', color: '#dc3545', textAlign: 'center' }}>등락</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCost = Math.floor((periodSummary.totalCost || 0) * 7.2);
+                      const prev7DaysCost = Math.floor((periodSummary.totalCost || 0) * 6.8);
+                      const changeRate = (recent7DaysCost / prev7DaysCost * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCost = Math.floor((periodSummary.totalCost || 0) * 7.2);
+                      const prev7DaysCost = Math.floor((periodSummary.totalCost || 0) * 6.8);
+                      const changeRate = (recent7DaysCost / prev7DaysCost * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 0.95);
+                      const prev7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 1.03);
+                      const changeRate = (recent7DaysCpc / prev7DaysCpc * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 0.95);
+                      const prev7DaysCpc = Math.floor((periodSummary.avgCpc || 0) * 1.03);
+                      const changeRate = (recent7DaysCpc / prev7DaysCpc * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08);
+                      const prev7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08);
+                      const changeRate = (recent7DaysConversions / prev7DaysConversions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08);
+                      const prev7DaysConversions = Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08);
+                      const changeRate = (recent7DaysConversions / prev7DaysConversions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 7.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08), 1));
+                      const prev7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 6.8 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08), 1));
+                      const changeRate = (recent7DaysCpa / prev7DaysCpa * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 7.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 7.0 * 0.08), 1));
+                      const prev7DaysCpa = Math.floor((periodSummary.totalCost || 0) * 6.8 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 6.5 * 0.08), 1));
+                      const changeRate = (recent7DaysCpa / prev7DaysCpa * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCvr = 12.3;
+                      const prev7DaysCvr = 11.8;
+                      const changeRate = (recent7DaysCvr / prev7DaysCvr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCvr = 12.3;
+                      const prev7DaysCvr = 11.8;
+                      const changeRate = (recent7DaysCvr / prev7DaysCvr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.9);
+                      const prev7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.2);
+                      const changeRate = (recent7DaysImpressions / prev7DaysImpressions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.9);
+                      const prev7DaysImpressions = Math.floor((periodSummary.totalImpressions || 0) * 6.2);
+                      const changeRate = (recent7DaysImpressions / prev7DaysImpressions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 7.0);
+                      const prev7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 6.5);
+                      const changeRate = (recent7DaysClicks / prev7DaysClicks * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 7.0);
+                      const prev7DaysClicks = Math.floor((periodSummary.totalClicks || 0) * 6.5);
+                      const changeRate = (recent7DaysClicks / prev7DaysClicks * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const recent7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 7.0) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.9), 1) * 100);
+                      const prev7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 6.5) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.2), 1) * 100);
+                      const changeRate = (recent7DaysCtr / prev7DaysCtr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const recent7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 7.0) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.9), 1) * 100);
+                      const prev7DaysCtr = (Math.floor((periodSummary.totalClicks || 0) * 6.5) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 6.2), 1) * 100);
+                      const changeRate = (recent7DaysCtr / prev7DaysCtr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                  </tr>
+                  
+                  {/* 전월 vs 당월 (순서 변경) */}
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>전월</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 31.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.avgCpc || 0) * 1.05).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 3.8).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 31.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.8), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>12.6%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 32.1).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 30.2).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(Math.floor((periodSummary.totalClicks || 0) * 30.2) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 32.1), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 10px', borderBottom: '1px solid #dee2e6', fontWeight: '600', textAlign: 'center' }}>당월</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 28.5).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.avgCpc || 0) * 0.97).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 3.4).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalCost || 0) * 28.5 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.4), 1)).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>11.3%</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalImpressions || 0) * 29.3).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{Math.floor((periodSummary.totalClicks || 0) * 30.1).toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}>{(Math.floor((periodSummary.totalClicks || 0) * 30.1) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 29.3), 1) * 100).toFixed(1)}%</td>
+                  </tr>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <td style={{ padding: '8px 10px', fontWeight: '600', color: '#dc3545', textAlign: 'center' }}>등락</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCost = Math.floor((periodSummary.totalCost || 0) * 28.5);
+                      const prevMonthCost = Math.floor((periodSummary.totalCost || 0) * 31.2);
+                      const changeRate = (currentMonthCost / prevMonthCost * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCost = Math.floor((periodSummary.totalCost || 0) * 28.5);
+                      const prevMonthCost = Math.floor((periodSummary.totalCost || 0) * 31.2);
+                      const changeRate = (currentMonthCost / prevMonthCost * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 0.97);
+                      const prevMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 1.05);
+                      const changeRate = (currentMonthCpc / prevMonthCpc * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 0.97);
+                      const prevMonthCpc = Math.floor((periodSummary.avgCpc || 0) * 1.05);
+                      const changeRate = (currentMonthCpc / prevMonthCpc * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.4);
+                      const prevMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.8);
+                      const changeRate = (currentMonthConversions / prevMonthConversions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.4);
+                      const prevMonthConversions = Math.floor((periodSummary.totalClicks || 0) * 3.8);
+                      const changeRate = (currentMonthConversions / prevMonthConversions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCpa = Math.floor((periodSummary.totalCost || 0) * 28.5 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.4), 1));
+                      const prevMonthCpa = Math.floor((periodSummary.totalCost || 0) * 31.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.8), 1));
+                      const changeRate = (currentMonthCpa / prevMonthCpa * 100 - 100);
+                      return changeRate <= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCpa = Math.floor((periodSummary.totalCost || 0) * 28.5 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.4), 1));
+                      const prevMonthCpa = Math.floor((periodSummary.totalCost || 0) * 31.2 / Math.max(Math.floor((periodSummary.totalClicks || 0) * 3.8), 1));
+                      const changeRate = (currentMonthCpa / prevMonthCpa * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCvr = 11.3;
+                      const prevMonthCvr = 12.6;
+                      const changeRate = (currentMonthCvr / prevMonthCvr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCvr = 11.3;
+                      const prevMonthCvr = 12.6;
+                      const changeRate = (currentMonthCvr / prevMonthCvr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 29.3);
+                      const prevMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 32.1);
+                      const changeRate = (currentMonthImpressions / prevMonthImpressions * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 29.3);
+                      const prevMonthImpressions = Math.floor((periodSummary.totalImpressions || 0) * 32.1);
+                      const changeRate = (currentMonthImpressions / prevMonthImpressions * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.1);
+                      const prevMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.2);
+                      const changeRate = (currentMonthClicks / prevMonthClicks * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.1);
+                      const prevMonthClicks = Math.floor((periodSummary.totalClicks || 0) * 30.2);
+                      const changeRate = (currentMonthClicks / prevMonthClicks * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center', color: (() => {
+                      const currentMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.1) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 29.3), 1) * 100);
+                      const prevMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.2) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 32.1), 1) * 100);
+                      const changeRate = (currentMonthCtr / prevMonthCtr * 100 - 100);
+                      return changeRate >= 0 ? '#28a745' : '#dc3545';
+                    })() }}>{(() => {
+                      const currentMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.1) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 29.3), 1) * 100);
+                      const prevMonthCtr = (Math.floor((periodSummary.totalClicks || 0) * 30.2) / Math.max(Math.floor((periodSummary.totalImpressions || 0) * 32.1), 1) * 100);
+                      const changeRate = (currentMonthCtr / prevMonthCtr * 100 - 100);
+                      return (changeRate >= 0 ? '▲' : '▼') + ' ' + Math.abs(changeRate).toFixed(1) + '%';
+                    })()}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1743,458 +3015,231 @@ function KeywordDataContent() {
             </span>
           </div>
           
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          {/* 데이터 필터 선택상자 */}
+          <div style={{ 
+            marginBottom: '20px', 
+            padding: '15px', 
+            background: '#ffffff', 
+            borderRadius: '6px',
+            border: '1px solid #dee2e6'
+          }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '10px', 
+              fontWeight: '600', 
+              color: '#495057',
+              fontSize: '0.9rem'
+            }}>
+              표시할 데이터 선택:
+            </label>
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+              {['광고비', 'CPC', '전환수', 'CPA', '기타'].map(filter => (
+                <label key={filter} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedDataFilters.includes(filter)}
+                    onChange={() => handleFilterChange(filter)}
+                    style={{ marginRight: '5px' }}
+                  />
+                  <span style={{ color: '#495057' }}>{filter}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* 상단 스크롤바 */}
+          <div style={{ 
+            marginBottom: '10px',
+            border: '1px solid #dee2e6',
+            borderRadius: '6px',
+            backgroundColor: '#f8f9fa'
+          }}>
+            <div 
+              ref={topScrollRef}
+              onScroll={handleTopScroll}
+              style={{ 
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                height: '17px',
+                borderRadius: '6px'
+              }}
+            >
+              <div style={{ 
+                width: `${getDetailedColumns().reduce((sum, col) => sum + parseInt(col.width), 0)}px`,
+                height: '1px'
+              }}></div>
+            </div>
+          </div>
+          
+          {/* 테이블 컨테이너 */}
+          <div 
+            ref={tableScrollRef}
+            onScroll={handleTableScroll}
+            style={{ 
+              overflowX: 'auto', 
+              marginBottom: '20px',
+              border: '1px solid #dee2e6',
+              borderRadius: '6px'
+            }}
+          >
+            <table style={{ 
+              width: 'max-content', 
+              minWidth: '100%',
+              borderCollapse: 'collapse', 
+              fontSize: '0.8rem',
+              background: '#ffffff'
+            }}>
               <thead>
-                {/* 첫 번째 헤더 행 */}
                 <tr style={{ background: '#e9ecef' }}>
-                  <th rowSpan="2" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    verticalAlign: 'middle'
-                  }}>키워드</th>
-                  <th rowSpan="2" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    verticalAlign: 'middle'
-                  }}>매체</th>
-                  <th rowSpan="2" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    verticalAlign: 'middle'
-                  }}>캠페인</th>
-                  <th rowSpan="2" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    verticalAlign: 'middle'
-                  }}>광고그룹</th>
-                  <th rowSpan="2" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    verticalAlign: 'middle'
-                  }}>노출수</th>
-                  <th rowSpan="2" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    verticalAlign: 'middle'
-                  }}>클릭수</th>
-                  <th rowSpan="2" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    verticalAlign: 'middle'
-                  }}>CTR</th>
-                  <th colSpan="4" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d4e6f1'
-                  }}>CPC</th>
-                  <th colSpan="4" style={{ 
-                    padding: '12px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    background: '#d5f4e6'
-                  }}>광고비</th>
-                </tr>
-                {/* 두 번째 헤더 행 */}
-                <tr style={{ background: '#e9ecef' }}>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d4e6f1',
-                    fontSize: '0.8rem'
-                  }}>금일</th>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d4e6f1',
-                    fontSize: '0.8rem'
-                  }}>전일</th>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d4e6f1',
-                    fontSize: '0.8rem'
-                  }}>최근 7일</th>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d4e6f1',
-                    fontSize: '0.8rem'
-                  }}>지난 주</th>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d5f4e6',
-                    fontSize: '0.8rem'
-                  }}>금일</th>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d5f4e6',
-                    fontSize: '0.8rem'
-                  }}>전일</th>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    borderRight: '1px solid #dee2e6',
-                    background: '#d5f4e6',
-                    fontSize: '0.8rem'
-                  }}>최근 7일</th>
-                  <th style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #dee2e6',
-                    background: '#d5f4e6',
-                    fontSize: '0.8rem'
-                  }}>지난 주</th>
+                  {getDetailedColumns().map((column, index) => (
+                    <th key={column.key} style={{ 
+                      padding: '12px 8px', 
+                      textAlign: 'center', 
+                      borderRight: index < getDetailedColumns().length - 1 ? '1px solid #dee2e6' : 'none',
+                      borderBottom: '2px solid #dee2e6',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#495057',
+                      width: column.width,
+                      minWidth: column.width,
+                      position: 'sticky',
+                      top: 0,
+                      background: column.group === '광고비' ? '#d5f4e6' : 
+                                column.group === 'CPC' ? '#d4e6f1' : 
+                                column.group === '전환수' ? '#fff3cd' : 
+                                column.group === 'CPA' ? '#f8d7da' : '#e9ecef',
+                      zIndex: 10
+                    }}>
+                      {column.title}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody onClick={handleOutsideClick}>
-                {filteredKeywords.map((item, index) => {
-                  // 키워드별 배경색 설정
-                  const isEvenKeyword = index % 2 === 0
-                  const backgroundColor = isEvenKeyword ? '#ffffff' : '#f8f9fa'
-                  
-                  return (
-                    <React.Fragment key={index}>
-                      <tr 
-                        style={{ 
-                          background: backgroundColor,
-                          borderLeft: index % 2 === 0 ? '3px solid #667eea' : '3px solid #28a745',
-                          cursor: 'pointer'
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleKeywordRowClick(index, item.keyword)
-                        }}
-                      >
-                        <td style={{ 
-                          padding: '10px', 
-                          borderBottom: '1px solid #dee2e6',
-                          borderRight: '1px solid #dee2e6',
-                          fontWeight: '600',
-                          color: '#495057'
-                        }}>
-                          {item.keyword}
-                        </td>
-                      <td style={{ 
-                        padding: '10px', 
+              <tbody>
+                {getPaginatedData().map((item, index) => (
+                  <tr key={index} style={{ 
+                    background: index % 2 === 0 ? '#ffffff' : '#f8f9fa',
+                    borderLeft: `3px solid ${index % 2 === 0 ? '#667eea' : '#28a745'}`,
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleKeywordRowClick(index, item.keyword)
+                  }}>
+                    {getDetailedColumns().map((column, colIndex) => (
+                      <td key={column.key} style={{ 
+                        padding: '10px 8px', 
+                        textAlign: 'center',
+                        borderRight: colIndex < getDetailedColumns().length - 1 ? '1px solid #dee2e6' : 'none',
                         borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'center'
+                        fontSize: '0.75rem',
+                        color: '#495057',
+                        fontWeight: column.key === 'keyword' || column.key === 'media' ? '600' : '400'
                       }}>
-                        {item.media}
+                        {column.key.includes('cost_') || column.key.includes('cpc_') || column.key.includes('cpa_') ? 
+                          (typeof item[column.key] === 'number' ? item[column.key].toLocaleString() : item[column.key]) :
+                          column.key === 'keyword' ? item.keyword :
+                          column.key === 'media' ? item.media :
+                          column.key === 'campaign' ? item.campaign :
+                          column.key === 'adGroup' ? item.adGroup :
+                          column.key === 'impressions' ? item.impressions.toLocaleString() :
+                          column.key === 'clicks' ? item.clicks.toLocaleString() :
+                          column.key === 'ctr' ? item.ctr + '%' :
+                          column.key === 'cvr' ? item.cvr :
+                          column.key.includes('conversions_') ? item[column.key].toLocaleString() :
+                          item[column.key] || '-'
+                        }
                       </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'center'
-                      }}>
-                        {item.campaign}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'center'
-                      }}>
-                        {item.adGroup}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right'
-                      }}>
-                        {item.impressions.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right'
-                      }}>
-                        {item.clicks.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right'
-                      }}>
-                        {item.ctr}%
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f8f9fa'
-                      }}>
-                        {item.cpc_today.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f8f9fa'
-                      }}>
-                        {item.cpc_yesterday.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f8f9fa'
-                      }}>
-                        {item.cpc_7days.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f8f9fa'
-                      }}>
-                        {item.cpc_last_week.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f0f9ff'
-                      }}>
-                        {item.cost_today.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f0f9ff'
-                      }}>
-                        {item.cost_yesterday.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        borderRight: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f0f9ff'
-                      }}>
-                        {item.cost_7days.toLocaleString()}
-                      </td>
-                      <td style={{ 
-                        padding: '10px', 
-                        borderBottom: '1px solid #dee2e6',
-                        textAlign: 'right',
-                        background: '#f0f9ff'
-                      }}>
-                        {item.cost_last_week.toLocaleString()}
-                      </td>
-                    </tr>
-                    {/* 키워드 행 클릭 시 나타나는 매체별 세부 데이터 */}
-                    {selectedKeywordIndex === index && (
-                      expandedKeywordData.map((mediaItem, mediaIndex) => (
-                        <tr key={`${index}-${mediaIndex}`} style={{ 
-                          background: '#f8f9fa', 
-                          borderLeft: '3px solid #ffc107',
-                          animation: 'slideDown 0.3s ease-out'
-                        }}>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            fontWeight: '500',
-                            color: '#6c757d',
-                            paddingLeft: '20px'
-                          }}>
-                            └ {mediaItem.keyword}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'center',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.media}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'center',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.campaign}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'center',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.adGroup}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.impressions.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.clicks.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.ctr}%
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f1f5f9',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cpc_today.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f1f5f9',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cpc_yesterday.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f1f5f9',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cpc_7days.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f1f5f9',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cpc_last_week.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f0f9ff',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cost_today.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f0f9ff',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cost_yesterday.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            borderRight: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f0f9ff',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cost_7days.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            padding: '8px 10px', 
-                            borderBottom: '1px solid #dee2e6',
-                            textAlign: 'right',
-                            background: '#f0f9ff',
-                            color: '#6c757d'
-                          }}>
-                            {mediaItem.cost_last_week.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </React.Fragment>
-                  )
-                })}
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-          {filteredKeywords.length === 0 && (
-            <div style={{ 
-              textAlign: 'center',
-              padding: '20px',
-              color: '#6c757d'
-            }}>
-              검색 조건에 맞는 키워드가 없습니다.
+
+          {/* 페이지네이션 */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            padding: '15px 0'
+          }}>
+            <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>
+              총 {filteredKeywords.length}개 중 {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredKeywords.length)}개 표시
             </div>
-          )}
+            
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <button
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '0.8rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  background: currentPage === 1 ? '#f8f9fa' : '#ffffff',
+                  color: currentPage === 1 ? '#6c757d' : '#495057',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                이전
+              </button>
+              
+              {Array.from({ length: getTotalPages() }, (_, i) => i + 1)
+                .filter(page => 
+                  page === 1 || 
+                  page === getTotalPages() || 
+                  (page >= currentPage - 2 && page <= currentPage + 2)
+                )
+                .map((page, index, array) => (
+                  <React.Fragment key={page}>
+                    {index > 0 && array[index - 1] !== page - 1 && (
+                      <span style={{ 
+                        padding: '8px 4px', 
+                        color: '#6c757d', 
+                        fontSize: '0.8rem' 
+                      }}>...</span>
+                    )}
+                    <button
+                      onClick={() => handlePageChange(page)}
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '0.8rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        background: currentPage === page ? '#007bff' : '#ffffff',
+                        color: currentPage === page ? '#ffffff' : '#495057',
+                        cursor: 'pointer',
+                        fontWeight: currentPage === page ? '600' : '400'
+                      }}
+                    >
+                      {page}
+                    </button>
+                  </React.Fragment>
+                ))}
+              
+              <button
+                onClick={() => handlePageChange(Math.min(getTotalPages(), currentPage + 1))}
+                disabled={currentPage === getTotalPages()}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '0.8rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  background: currentPage === getTotalPages() ? '#f8f9fa' : '#ffffff',
+                  color: currentPage === getTotalPages() ? '#6c757d' : '#495057',
+                  cursor: currentPage === getTotalPages() ? 'not-allowed' : 'pointer'
+                }}
+              >
+                다음
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
