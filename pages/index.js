@@ -659,10 +659,9 @@ function UnauthorizedContent() {
 function DailyDataContent() {
   const { selectedAdvertiser } = useAuth()
   
-  // 어제 날짜 계산 (로컬 시간 기준)
+  // 오늘 날짜 및 이번 달 첫째 날 계산 (로컬 시간 기준)
   const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
   
   // 로컬 시간 기준으로 YYYY-MM-DD 형식 변환
   const formatLocalDate = (date) => {
@@ -674,12 +673,8 @@ function DailyDataContent() {
   
   // 필터 상태 관리
   const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타', '틱톡'])
-  const [keywordMetric, setKeywordMetric] = useState('광고비')
-  const [sortOrder, setSortOrder] = useState('내림차순')
-  const [keywordCount, setKeywordCount] = useState('')
-  const [selectedDate, setSelectedDate] = useState(formatLocalDate(yesterday))
-  const [costRangeMin, setCostRangeMin] = useState('')
-  const [costRangeMax, setCostRangeMax] = useState('')
+  const [startDate, setStartDate] = useState(formatLocalDate(firstDayOfMonth))
+  const [endDate, setEndDate] = useState(formatLocalDate(today))
   
   // 검색 결과 상태 관리
   const [filteredKeywords, setFilteredKeywords] = useState([])
@@ -802,19 +797,8 @@ function DailyDataContent() {
       setSelectedDateIndex(null)
       setExpandedDateData([])
     } else {
-      // 해당 날짜의 매체별 데이터 생성
-      const mediaData = ['네이버', '카카오', '구글', '메타', '틱톡'].map(media => ({
-        date,
-        media,
-        campaign: `${media} 일자별 캠페인`,
-        impressions: Math.floor(Math.random() * 15000) + 5000,
-        clicks: Math.floor(Math.random() * 800) + 200,
-        ctr: parseFloat(((Math.random() * 4) + 1).toFixed(1)),
-        cpc: Math.floor(Math.random() * 600) + 200,
-        cost: Math.floor(Math.random() * 400000) + 100000,
-        conversions: Math.floor(Math.random() * 50) + 10,
-        revenue: Math.floor(Math.random() * 500000) + 100000
-      }))
+      // 해당 날짜의 매체별 데이터 생성 (일자별 데이터와 동일한 로직 사용)
+      const mediaData = generateMediaDataForDate(date)
       
       setSelectedDateIndex(index)
       setExpandedDateData(mediaData)
@@ -829,34 +813,85 @@ function DailyDataContent() {
     setExpandedDateData([])
   }
 
-  // 일자별 고정 더미 데이터 생성
-  const generateDailyData = () => {
-    const fixedData = [
-      { impressions: 25000, clicks: 1250, conversions: 75, cost: 300000, revenue: 600000, cpc: 240 },
-      { impressions: 32000, clicks: 1600, conversions: 95, cost: 380000, revenue: 750000, cpc: 238 },
-      { impressions: 28000, clicks: 1400, conversions: 82, cost: 335000, revenue: 680000, cpc: 239 },
-      { impressions: 35000, clicks: 1750, conversions: 105, cost: 420000, revenue: 850000, cpc: 240 },
-      { impressions: 22000, clicks: 1100, conversions: 65, cost: 265000, revenue: 530000, cpc: 241 },
-      { impressions: 40000, clicks: 2000, conversions: 120, cost: 480000, revenue: 960000, cpc: 240 },
-      { impressions: 30000, clicks: 1500, conversions: 90, cost: 360000, revenue: 720000, cpc: 240 },
-    ]
+  // 특정 날짜의 매체별 데이터 생성 함수
+  const generateMediaDataForDate = (date) => {
+    // 날짜를 기반으로 시드 생성 (일관된 데이터를 위해)
+    const dateStr = date.replace(/-/g, '')
+    const seed = parseInt(dateStr) % 1000
     
+    const mediaBaseData = {
+      '네이버': { baseImpressions: 8000, baseClicks: 400, baseCost: 120000, baseConversions: 24 },
+      '카카오': { baseImpressions: 6000, baseClicks: 300, baseCost: 90000, baseConversions: 18 },
+      '구글': { baseImpressions: 10000, baseClicks: 500, baseCost: 150000, baseConversions: 30 },
+      '메타': { baseImpressions: 7000, baseClicks: 350, baseCost: 105000, baseConversions: 21 },
+      '틱톡': { baseImpressions: 12000, baseClicks: 600, baseCost: 180000, baseConversions: 36 }
+    }
+    
+    return ['네이버', '카카오', '구글', '메타', '틱톡'].map((media, index) => {
+      const base = mediaBaseData[media]
+      const variation = (seed + index * 100) % 50 - 25 // -25% ~ +25% 변동
+      const factor = 1 + (variation / 100)
+      
+             const impressions = Math.floor(base.baseImpressions * factor)
+       const clicks = Math.floor(base.baseClicks * factor)
+       const cost = Math.floor(base.baseCost * factor)
+       const conversions = Math.floor(base.baseConversions * factor)
+       const ctr = impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(1)) : 0
+       const cpc = clicks > 0 ? Math.round(cost / clicks) : 0
+       const cpa = conversions > 0 ? Math.round(cost / conversions) : 0
+       const cvr = clicks > 0 ? parseFloat(((conversions / clicks) * 100).toFixed(1)) : 0
+       
+       return {
+         date,
+         media,
+         campaign: `${media} 일자별 캠페인`,
+         impressions,
+         clicks,
+         ctr,
+         cpc,
+         cost,
+         conversions,
+         cpa,
+         cvr,
+         revenue: Math.floor(cost * 1.8) // 수익은 광고비의 1.8배로 가정
+       }
+    })
+  }
+
+  // 일자별 데이터 생성 (매체별 데이터의 합산)
+  const generateDailyData = () => {
     const data = []
     for (let i = 30; i >= 0; i--) {
       const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-      const dayData = fixedData[i % fixedData.length]
-      // 광고비는 최소 50000원 이상 보장, 전환수는 최대 999개 제한
-      const cost = Math.max(50000, dayData.cost)
-      const conversions = Math.min(999, dayData.conversions)
+      const dateStr = date.toISOString().split('T')[0]
+      
+      // 해당 날짜의 매체별 데이터 생성
+      const mediaData = generateMediaDataForDate(dateStr)
+      
+      // 매체별 데이터 합산
+      const totalImpressions = mediaData.reduce((sum, item) => sum + item.impressions, 0)
+      const totalClicks = mediaData.reduce((sum, item) => sum + item.clicks, 0)
+      const totalCost = mediaData.reduce((sum, item) => sum + item.cost, 0)
+      const totalConversions = mediaData.reduce((sum, item) => sum + item.conversions, 0)
+      const totalRevenue = mediaData.reduce((sum, item) => sum + item.revenue, 0)
+      
+      // 계산된 지표
+      const ctr = totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(1)) : 0
+      const cpc = totalClicks > 0 ? Math.round(totalCost / totalClicks) : 0
+      const cpa = totalConversions > 0 ? Math.round(totalCost / totalConversions) : 0
+      const cvr = totalClicks > 0 ? parseFloat(((totalConversions / totalClicks) * 100).toFixed(1)) : 0
       
       data.push({
-        date: date.toISOString().split('T')[0],
-        impressions: dayData.impressions,
-        clicks: dayData.clicks,
-        conversions: conversions,
-        cost: cost,
-        revenue: dayData.revenue,
-        cpc: dayData.cpc
+        date: dateStr,
+        impressions: totalImpressions,
+        clicks: totalClicks,
+        conversions: totalConversions,
+        cost: totalCost,
+        revenue: totalRevenue,
+        cpc,
+        cpa,
+        cvr,
+        ctr
       })
     }
     return data
@@ -920,32 +955,16 @@ function DailyDataContent() {
     }))
   }
 
-  // 선택된 날짜에 따른 일자별 데이터 필터링
+  // 선택된 날짜 범위에 따른 일자별 데이터 필터링
   const getFilteredDailyData = () => {
-    if (!selectedDate) return dailyData
+    if (!startDate || !endDate) return dailyData
 
     return dailyData.filter(item => {
-      return item.date === selectedDate
+      return item.date >= startDate && item.date <= endDate
     })
   }
 
-  // 컴포넌트 마운트 시 데이터 생성
-  useEffect(() => {
-    if (selectedAdvertiser) {
-      // 일자별 데이터 생성
-      const initialData = generateDailyData()
-      setDailyData(initialData)
-      
-      // 키워드 데이터 생성
-      const keywordInitialData = generateKeywordData()
-      setKeywordData(keywordInitialData)
-      
-      // 초기 로딩 시 기본 검색 실행
-      setTimeout(() => {
-        handleSearch()
-      }, 100)
-    }
-  }, [selectedAdvertiser])
+
 
   // 기간별 합산 정보 계산
   const calculatePeriodSummary = (data) => {
@@ -1123,7 +1142,7 @@ function DailyDataContent() {
     }
   }
 
-  // 키워드 데이터 필터링 및 정렬
+  // 키워드 데이터 필터링
   const getFilteredKeywords = () => {
     let filtered = [...keywordData]
     
@@ -1168,60 +1187,74 @@ function DailyDataContent() {
     // 그룹화된 데이터를 배열로 변환
     filtered = Object.values(groupedByKeyword)
     
-    // CPC 선택 시 광고비 범위 필터링
-    if (keywordMetric === 'CPC') {
-      if (costRangeMin && !isNaN(costRangeMin)) {
-        filtered = filtered.filter(item => item.cost_today >= parseInt(costRangeMin))
-      }
-      if (costRangeMax && !isNaN(costRangeMax)) {
-        filtered = filtered.filter(item => item.cost_today <= parseInt(costRangeMax))
-      }
-    }
-    
-    // 선택된 지표에 따라 정렬
-    filtered.sort((a, b) => {
-      let valueA, valueB
-      switch (keywordMetric) {
-        case '클릭수':
-          valueA = a.clicks
-          valueB = b.clicks
-          break
-        case 'CPC':
-          valueA = a.cpc_today
-          valueB = b.cpc_today
-          break
-        case '광고비':
-        default:
-          valueA = a.cost_today
-          valueB = b.cost_today
-          break
-      }
-      
-      return sortOrder === '내림차순' ? valueB - valueA : valueA - valueB
-    })
-    
-    // 개수 제한
-    if (keywordCount && !isNaN(keywordCount) && keywordCount > 0) {
-      filtered = filtered.slice(0, parseInt(keywordCount))
-    }
+    // 광고비 내림차순 정렬
+    filtered.sort((a, b) => b.cost_today - a.cost_today)
     
     return filtered
   }
 
   // 컴포넌트 마운트 시 데이터 생성
   useEffect(() => {
-    // 기본 데이터 생성 (페이지 진입 시 바로 표시)
-    const data = generateKeywordData()
-    setKeywordData(data)
-    
-    // 기본 검색 실행하여 초기 데이터 표시
-    const results = data.filter(item => selectedMedias.includes(item.media))
-    setFilteredKeywords(results)
+    if (selectedAdvertiser) {
+      // 일자별 데이터 생성
+      const dailyInitialData = generateDailyData()
+      setDailyData(dailyInitialData)
+      
+      // 키워드 데이터 생성
+      const keywordInitialData = generateKeywordData()
+      setKeywordData(keywordInitialData)
+      
+      // 초기 데이터 필터링 및 표시
+      const filteredDaily = dailyInitialData.filter(item => {
+        return item.date >= startDate && item.date <= endDate
+      })
+      setFilteredDailyData(filteredDaily)
     
     // 기간별 요약 정보 계산
-    const summary = calculateKeywordPeriodSummary(results)
+      const summary = calculatePeriodSummary(filteredDaily)
     setPeriodSummary(summary)
-  }, [])
+      
+      // 키워드 데이터 필터링
+      const filteredKeywords = keywordInitialData.filter(item => selectedMedias.includes(item.media))
+      const groupedByKeyword = {}
+      filteredKeywords.forEach(item => {
+        if (!groupedByKeyword[item.keyword]) {
+          groupedByKeyword[item.keyword] = {
+            keyword: item.keyword,
+            media: item.media,
+            campaign: item.campaign,
+            adGroup: item.adGroup,
+            impressions: item.impressions,
+            clicks: item.clicks,
+            ctr: item.ctr,
+            cpc_today: item.cpc_today,
+            cpc_yesterday: item.cpc_yesterday,
+            cpc_7days: item.cpc_7days,
+            cpc_last_week: item.cpc_last_week,
+            cost_today: item.cost_today,
+            cost_yesterday: item.cost_yesterday,
+            cost_7days: item.cost_7days,
+            cost_last_week: item.cost_last_week
+          }
+        } else {
+          // 동일 키워드의 경우 광고비 합계
+          groupedByKeyword[item.keyword].cost_today += item.cost_today
+          groupedByKeyword[item.keyword].cost_yesterday += item.cost_yesterday
+          groupedByKeyword[item.keyword].cost_7days += item.cost_7days
+          groupedByKeyword[item.keyword].cost_last_week += item.cost_last_week
+          // 노출수, 클릭수도 합계
+          groupedByKeyword[item.keyword].impressions += item.impressions
+          groupedByKeyword[item.keyword].clicks += item.clicks
+          // CTR 재계산
+          groupedByKeyword[item.keyword].ctr = parseFloat(((groupedByKeyword[item.keyword].clicks / groupedByKeyword[item.keyword].impressions) * 100).toFixed(1))
+        }
+      })
+      
+      const finalKeywords = Object.values(groupedByKeyword)
+      finalKeywords.sort((a, b) => b.cost_today - a.cost_today)
+      setFilteredKeywords(finalKeywords)
+    }
+  }, [selectedAdvertiser, startDate, endDate, selectedMedias])
 
   return (
     <div className="content-area">
@@ -1238,10 +1271,17 @@ function DailyDataContent() {
         <div style={{ 
           display: 'flex', 
           gap: '15px',
-          alignItems: 'flex-start'
+          alignItems: 'flex-start',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '15px',
+            alignItems: 'flex-start',
+            flex: '1'
         }}>
           {/* 매체 선택 */}
-          <div style={{ flex: '1' }}>
+            <div style={{ flex: '0.8' }}>
             <label style={{ 
               display: 'block', 
               marginBottom: '8px', 
@@ -1274,7 +1314,7 @@ function DailyDataContent() {
           </div>
 
           {/* 조회 날짜 */}
-          <div style={{ minWidth: '160px' }}>
+            <div style={{ minWidth: '320px' }}>
             <label style={{ 
               display: 'block', 
               marginBottom: '8px', 
@@ -1283,107 +1323,52 @@ function DailyDataContent() {
             }}>조회 날짜</label>
             <div style={{ 
               display: 'flex', 
+                gap: '8px', 
               alignItems: 'center'
             }}>
               <input
                 type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                 style={{
                   padding: '6px 8px',
                   border: '1px solid #dee2e6',
                   borderRadius: '4px',
                   fontSize: '0.9rem',
-                  width: '140px'
-                }}
-              />
-            </div>
-          </div>
-          
-          {/* 키워드 필터링 */}
-          <div style={{ flex: '2' }}>
-            <label style={{ 
-              display: 'block', 
-              marginBottom: '8px', 
-              fontWeight: '600',
-              color: '#495057'
-            }}>키워드 필터링</label>
-            <div style={{ 
-              display: 'flex', 
-              gap: '15px',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div style={{
-                display: 'flex',
-                gap: '15px',
-                alignItems: 'center'
-              }}>
-                {/* 지표 선택 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>지표</label>
-                  <select 
-                    value={keywordMetric}
-                    onChange={(e) => setKeywordMetric(e.target.value)}
-                    style={{
-                      padding: '6px 8px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '4px',
+                    width: '140px',
+                    height: '34px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <span style={{ 
                       fontSize: '0.9rem',
-                      width: '100px',
-                      height: '34px'
-                    }}
-                  >
-                    <option value="클릭수">클릭수</option>
-                    <option value="CPC">CPC</option>
-                    <option value="광고비">광고비</option>
-                  </select>
-                </div>
-                
-                {/* 정렬 선택 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>정렬</label>
-                  <select 
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value)}
-                    style={{
-                      padding: '6px 8px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '0.9rem',
-                      width: '100px',
-                      height: '34px'
-                    }}
-                  >
-                    <option value="내림차순">내림차순</option>
-                    <option value="오름차순">오름차순</option>
-                  </select>
-                </div>
-                
-                {/* 개수 입력 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontSize: '0.9rem', color: '#6c757d', minWidth: '30px' }}>개수</label>
+                  color: '#6c757d',
+                  fontWeight: '500'
+                }}>~</span>
                   <input
-                    type="number"
-                    value={keywordCount}
-                    onChange={(e) => setKeywordCount(e.target.value)}
-                    placeholder="전체"
-                    min="1"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                     style={{
                       padding: '6px 8px',
                       border: '1px solid #dee2e6',
                       borderRadius: '4px',
                       fontSize: '0.9rem',
-                      width: '100px',
+                    width: '140px',
                       height: '34px',
                       boxSizing: 'border-box'
                     }}
                   />
+              </div>
                 </div>
               </div>
 
               {/* 검색 버튼 */}
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'flex-end',
+            height: '100%'
+          }}>
               <button
                 onClick={handleSearch}
                 style={{
@@ -1396,7 +1381,8 @@ function DailyDataContent() {
                   fontSize: '0.9rem',
                   fontWeight: '600',
                   transition: 'background 0.2s',
-                  height: '34px'
+                height: '34px',
+                boxSizing: 'border-box'
                 }}
                 onMouseOver={(e) => e.target.style.background = '#218838'}
                 onMouseOut={(e) => e.target.style.background = '#28a745'}
@@ -1404,49 +1390,6 @@ function DailyDataContent() {
                 검색
               </button>
             </div>
-
-            {/* CPC 선택 시 광고비 범위 입력 */}
-            {keywordMetric === 'CPC' && (
-              <div style={{ 
-                display: 'flex', 
-                gap: '15px',
-                alignItems: 'center',
-                marginTop: '10px'
-              }}>
-                <label style={{ fontSize: '0.9rem', color: '#6c757d' }}>광고비 범위</label>
-                <input
-                  type="number"
-                  value={costRangeMin}
-                  onChange={(e) => setCostRangeMin(e.target.value)}
-                  placeholder="최소"
-                  min="0"
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '100px'
-                  }}
-                />
-                <span style={{ fontSize: '0.9rem', color: '#6c757d' }}>이상</span>
-                <input
-                  type="number"
-                  value={costRangeMax}
-                  onChange={(e) => setCostRangeMax(e.target.value)}
-                  placeholder="최대"
-                  min="0"
-                  style={{
-                    padding: '6px 8px',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    fontSize: '0.9rem',
-                    width: '100px'
-                  }}
-                />
-                <span style={{ fontSize: '0.9rem', color: '#6c757d' }}>이하</span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
       
@@ -1803,11 +1746,14 @@ function DailyDataContent() {
               <thead>
                 <tr style={{ background: '#e9ecef' }}>
                   <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #dee2e6' }}>일자</th>
+                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>광고비</th>
+                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>CPC</th>
+                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>전환수</th>
+                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>CPA</th>
+                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>CVR</th>
                   <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>노출수</th>
                   <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>클릭수</th>
                   <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>CTR</th>
-                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>CPC</th>
-                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>광고비</th>
                 </tr>
               </thead>
               <tbody onClick={handleOutsideClick}>
@@ -1837,19 +1783,28 @@ function DailyDataContent() {
                           {item.date}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
+                          {item.cost.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
+                          {item.cpc.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
+                          {item.conversions.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
+                          {item.cpa.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
+                          {item.cvr}%
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
                           {item.impressions.toLocaleString()}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
                           {item.clicks.toLocaleString()}
                         </td>
                         <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
-                          {item.impressions > 0 ? ((item.clicks / item.impressions) * 100).toFixed(1) + '%' : '0.0%'}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
-                          {item.cpc.toLocaleString()}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #dee2e6' }}>
-                          {item.cost.toLocaleString()}
+                          {item.ctr}%
                         </td>
                       </tr>
                       
@@ -1876,6 +1831,46 @@ function DailyDataContent() {
                               borderBottom: '1px solid #dee2e6',
                               color: '#6c757d'
                             }}>
+                              {mediaItem.cost.toLocaleString()}
+                            </td>
+                            <td style={{ 
+                              padding: '8px 12px', 
+                              textAlign: 'right', 
+                              borderBottom: '1px solid #dee2e6',
+                              color: '#6c757d'
+                            }}>
+                              {mediaItem.cpc.toLocaleString()}
+                            </td>
+                            <td style={{ 
+                              padding: '8px 12px', 
+                              textAlign: 'right', 
+                              borderBottom: '1px solid #dee2e6',
+                              color: '#6c757d'
+                            }}>
+                              {mediaItem.conversions.toLocaleString()}
+                            </td>
+                            <td style={{ 
+                              padding: '8px 12px', 
+                              textAlign: 'right', 
+                              borderBottom: '1px solid #dee2e6',
+                              color: '#6c757d'
+                            }}>
+                              {mediaItem.cpa.toLocaleString()}
+                            </td>
+                            <td style={{ 
+                              padding: '8px 12px', 
+                              textAlign: 'right', 
+                              borderBottom: '1px solid #dee2e6',
+                              color: '#6c757d'
+                            }}>
+                              {mediaItem.cvr}%
+                            </td>
+                            <td style={{ 
+                              padding: '8px 12px', 
+                              textAlign: 'right', 
+                              borderBottom: '1px solid #dee2e6',
+                              color: '#6c757d'
+                            }}>
                               {mediaItem.impressions.toLocaleString()}
                             </td>
                             <td style={{ 
@@ -1892,23 +1887,7 @@ function DailyDataContent() {
                               borderBottom: '1px solid #dee2e6',
                               color: '#6c757d'
                             }}>
-                              {mediaItem.ctr.toFixed(1)}%
-                            </td>
-                            <td style={{ 
-                              padding: '8px 12px', 
-                              textAlign: 'right', 
-                              borderBottom: '1px solid #dee2e6',
-                              color: '#6c757d'
-                            }}>
-                              {mediaItem.cpc.toLocaleString()}
-                            </td>
-                            <td style={{ 
-                              padding: '8px 12px', 
-                              textAlign: 'right', 
-                              borderBottom: '1px solid #dee2e6',
-                              color: '#6c757d'
-                            }}>
-                              {mediaItem.cost.toLocaleString()}
+                              {mediaItem.ctr}%
                             </td>
                           </tr>
                         ))
@@ -2058,6 +2037,13 @@ function KeywordDataContent() {
     // 기간별 요약 정보 계산
     const summary = calculateKeywordPeriodSummary(results)
     setPeriodSummary(summary)
+    
+    // 검색 시 확장된 키워드 정보 초기화
+    setSelectedKeywordIndex(null)
+    setExpandedKeywordData([])
+    
+    // 첫 번째 페이지로 이동
+    setCurrentPage(1)
   }
 
   // 키워드 행 클릭 처리
@@ -2068,34 +2054,39 @@ function KeywordDataContent() {
     } else {
       setSelectedKeywordIndex(index)
       
-      // 해당 키워드의 매체별 데이터 생성
-      const mediaData = ['네이버', '카카오', '구글', '메타', '틱톡'].map(media => ({
-        media,
-        keyword,
-        campaign: `${media} ${keyword} 캠페인`,
-        adGroup: `${media} ${keyword} 광고그룹`,
-        impressions: Math.floor(Math.random() * 10000) + 1000,
-        clicks: Math.floor(Math.random() * 500) + 50,
-        ctr: parseFloat(((Math.random() * 5) + 1).toFixed(1)),
-        cpc_today: Math.floor(Math.random() * 1000) + 100,
-        cpc_yesterday: Math.floor(Math.random() * 1000) + 100,
-        cpc_7days: Math.floor(Math.random() * 1000) + 100,
-        cpc_last_week: Math.floor(Math.random() * 1000) + 100,
-        cost_today: Math.floor(Math.random() * 200000) + 100000,
-        cost_yesterday: Math.floor(Math.random() * 200000) + 100000,
-        cost_7days: Math.floor(Math.random() * 700000) + 70000,
-        cost_last_week: Math.floor(Math.random() * 700000) + 70000
+      // 해당 키워드의 모든 매체 데이터를 실제 데이터에서 찾아서 가져오기
+      const keywordSpecificData = keywordData.filter(item => item.keyword === keyword)
+      
+      // 확장된 데이터 생성
+      const expandedData = keywordSpecificData.map(item => ({
+        ...generateExpandedKeywordData(item),
+        isExpanded: true
       }))
       
-      setExpandedKeywordData(mediaData)
+      setExpandedKeywordData(expandedData)
     }
   }
 
   // 외부 클릭 처리
-  const handleOutsideClick = () => {
-    setSelectedKeywordIndex(null)
-    setExpandedKeywordData([])
+  const handleOutsideClick = (event) => {
+    // 테이블 행을 클릭한 경우가 아닐 때만 닫기
+    if (!event.target.closest('.keyword-table-row')) {
+      setSelectedKeywordIndex(null)
+      setExpandedKeywordData([])
+    }
   }
+
+  // 문서 전체에 클릭 이벤트 리스너 추가
+  useEffect(() => {
+    const handleDocumentClick = (event) => {
+      handleOutsideClick(event)
+    }
+    
+    document.addEventListener('click', handleDocumentClick)
+    return () => {
+      document.removeEventListener('click', handleDocumentClick)
+    }
+  }, [])
 
   // 일자별 데이터 생성
   const generateDailyData = () => {
@@ -2451,6 +2442,9 @@ function KeywordDataContent() {
   // 페이지 변경 핸들러
   const handlePageChange = (page) => {
     setCurrentPage(page)
+    // 페이지 변경 시 확장된 키워드 정보 초기화
+    setSelectedKeywordIndex(null)
+    setExpandedKeywordData([])
   }
 
   // 필터 변경 핸들러
@@ -3011,7 +3005,7 @@ function KeywordDataContent() {
               color: '#6c757d',
               fontStyle: 'italic'
             }}>
-              키워드를 클릭하면 매체별 비교가 가능합니다.
+              키워드 행을 클릭하면 해당 키워드의 매체별 상세 데이터가 슬라이딩되어 표시됩니다.
             </span>
           </div>
           
@@ -3122,41 +3116,116 @@ function KeywordDataContent() {
               </thead>
               <tbody>
                 {getPaginatedData().map((item, index) => (
-                  <tr key={index} style={{ 
-                    background: index % 2 === 0 ? '#ffffff' : '#f8f9fa',
-                    borderLeft: `3px solid ${index % 2 === 0 ? '#667eea' : '#28a745'}`,
-                    cursor: 'pointer'
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleKeywordRowClick(index, item.keyword)
-                  }}>
-                    {getDetailedColumns().map((column, colIndex) => (
-                      <td key={column.key} style={{ 
-                        padding: '10px 8px', 
-                        textAlign: 'center',
-                        borderRight: colIndex < getDetailedColumns().length - 1 ? '1px solid #dee2e6' : 'none',
-                        borderBottom: '1px solid #dee2e6',
-                        fontSize: '0.75rem',
-                        color: '#495057',
-                        fontWeight: column.key === 'keyword' || column.key === 'media' ? '600' : '400'
+                  <React.Fragment key={index}>
+                    {/* 기본 행 */}
+                    <tr className="keyword-table-row" style={{ 
+                      background: selectedKeywordIndex === index ? '#e3f2fd' : 
+                                 index % 2 === 0 ? '#ffffff' : '#f8f9fa',
+                      borderLeft: `3px solid ${selectedKeywordIndex === index ? '#ff6b6b' : 
+                                               index % 2 === 0 ? '#667eea' : '#28a745'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleKeywordRowClick(index, item.keyword)
+                    }}>
+                      {getDetailedColumns().map((column, colIndex) => (
+                        <td key={column.key} style={{ 
+                          padding: '10px 8px', 
+                          textAlign: 'center',
+                          borderRight: colIndex < getDetailedColumns().length - 1 ? '1px solid #dee2e6' : 'none',
+                          borderBottom: '1px solid #dee2e6',
+                          fontSize: '0.75rem',
+                          color: '#495057',
+                          fontWeight: column.key === 'keyword' || column.key === 'media' ? '600' : '400'
+                        }}>
+                          {column.key.includes('cost_') || column.key.includes('cpc_') || column.key.includes('cpa_') ? 
+                            (typeof item[column.key] === 'number' ? item[column.key].toLocaleString() : item[column.key]) :
+                            column.key === 'keyword' ? item.keyword :
+                            column.key === 'media' ? item.media :
+                            column.key === 'campaign' ? item.campaign :
+                            column.key === 'adGroup' ? item.adGroup :
+                            column.key === 'impressions' ? item.impressions.toLocaleString() :
+                            column.key === 'clicks' ? item.clicks.toLocaleString() :
+                            column.key === 'ctr' ? item.ctr + '%' :
+                            column.key === 'cvr' ? item.cvr :
+                            column.key.includes('conversions_') ? item[column.key].toLocaleString() :
+                            item[column.key] || '-'
+                          }
+                        </td>
+                      ))}
+                    </tr>
+                    
+                    {/* 확장된 행들 - 슬라이딩 애니메이션 */}
+                    {selectedKeywordIndex === index && expandedKeywordData.length > 0 && (
+                      <tr style={{ 
+                        animation: 'slideDown 0.3s ease-out',
+                        background: '#f0f8ff'
                       }}>
-                        {column.key.includes('cost_') || column.key.includes('cpc_') || column.key.includes('cpa_') ? 
-                          (typeof item[column.key] === 'number' ? item[column.key].toLocaleString() : item[column.key]) :
-                          column.key === 'keyword' ? item.keyword :
-                          column.key === 'media' ? item.media :
-                          column.key === 'campaign' ? item.campaign :
-                          column.key === 'adGroup' ? item.adGroup :
-                          column.key === 'impressions' ? item.impressions.toLocaleString() :
-                          column.key === 'clicks' ? item.clicks.toLocaleString() :
-                          column.key === 'ctr' ? item.ctr + '%' :
-                          column.key === 'cvr' ? item.cvr :
-                          column.key.includes('conversions_') ? item[column.key].toLocaleString() :
-                          item[column.key] || '-'
-                        }
-                      </td>
-                    ))}
-                  </tr>
+                        <td colSpan={getDetailedColumns().length} style={{ 
+                          padding: '0',
+                          borderBottom: '2px solid #2196f3'
+                        }}>
+                          <div className="keyword-expanded-container">
+                            <div className="keyword-expanded-header">
+                              <div className="keyword-expanded-indicator"></div>
+                              <h4 className="keyword-expanded-title">
+                                "{item.keyword}" 키워드의 매체별 상세 데이터
+                              </h4>
+                              <span className="keyword-expanded-count">
+                                ({expandedKeywordData.length}개 매체)
+                              </span>
+                            </div>
+                            
+                            <div className="keyword-expanded-table">
+                              <table>
+                                <thead>
+                                  <tr>
+                                    {getDetailedColumns().map((column, colIndex) => (
+                                      <th key={column.key} style={{ 
+                                        width: column.width,
+                                        minWidth: column.width,
+                                        borderRight: colIndex < getDetailedColumns().length - 1 ? '1px solid #dee2e6' : 'none'
+                                      }}>
+                                        {column.title}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {expandedKeywordData.map((expandedItem, expandedIndex) => (
+                                    <tr key={expandedIndex}>
+                                      {getDetailedColumns().map((column, colIndex) => (
+                                        <td key={column.key} style={{ 
+                                          borderRight: colIndex < getDetailedColumns().length - 1 ? '1px solid #dee2e6' : 'none',
+                                          fontWeight: column.key === 'keyword' || column.key === 'media' ? '600' : '400'
+                                        }}>
+                                          {column.key.includes('cost_') || column.key.includes('cpc_') || column.key.includes('cpa_') ? 
+                                            (typeof expandedItem[column.key] === 'number' ? expandedItem[column.key].toLocaleString() : expandedItem[column.key]) :
+                                            column.key === 'keyword' ? expandedItem.keyword :
+                                            column.key === 'media' ? expandedItem.media :
+                                            column.key === 'campaign' ? expandedItem.campaign :
+                                            column.key === 'adGroup' ? expandedItem.adGroup :
+                                            column.key === 'impressions' ? expandedItem.impressions.toLocaleString() :
+                                            column.key === 'clicks' ? expandedItem.clicks.toLocaleString() :
+                                            column.key === 'ctr' ? expandedItem.ctr + '%' :
+                                            column.key === 'cvr' ? expandedItem.cvr :
+                                            column.key.includes('conversions_') ? expandedItem[column.key].toLocaleString() :
+                                            expandedItem[column.key] || '-'
+                                          }
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
