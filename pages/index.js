@@ -11,6 +11,183 @@ import InteractiveChart from '../components/Dashboard/InteractiveChart'
 import DataTable from '../components/Dashboard/DataTable'
 import ExportBar from '../components/Dashboard/ExportBar'
 
+// 설정 상수들
+const CONFIG = {
+  DATA_PERIOD_DAYS: 30,
+  DATE_RANGE: {
+    DEFAULT_START_OFFSET: 7, // 기본 시작일 (7일 전)
+    MAX_HISTORICAL_DAYS: 365
+  },
+  RANDOM_RANGES: {
+    IMPRESSIONS: { min: 1000, max: 100000 },
+    CLICKS: { min: 0.01, max: 0.1 }, // 노출수 대비 비율
+    CONVERSIONS: { min: 0.01, max: 0.2 }, // 클릭수 대비 비율
+    CPC: { min: 100, max: 2000 },
+    REVENUE_MULTIPLIER: { min: 1.5, max: 2.5 }, // 비용 대비 수익 배수
+    COST_VARIATION: { min: 0.8, max: 1.2 } // 비용 변동 범위
+  },
+  CHANGE_RATES: {
+    DAILY: { min: -15, max: 20 }, // 일일 변동률 범위
+    WEEKLY: { min: -10, max: 15 }, // 주간 변동률 범위
+    MONTHLY: { min: -8, max: 12 } // 월간 변동률 범위
+  },
+  DISPLAY: {
+    ITEMS_PER_PAGE: 10,
+    DECIMAL_PLACES: 1
+  }
+}
+
+// 유틸리티 함수들
+const utils = {
+  // 랜덤 숫자 생성 (범위 내)
+  randomBetween: (min, max) => Math.random() * (max - min) + min,
+  
+  // 랜덤 정수 생성 (범위 내)
+  randomInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+  
+  // 날짜 계산 유틸리티
+  getDateOffset: (offsetDays) => {
+    const date = new Date()
+    date.setDate(date.getDate() - offsetDays)
+    return date
+  },
+  
+  // 날짜 포맷팅
+  formatDate: (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  },
+  
+  // 퍼센트 계산
+  calculatePercentage: (numerator, denominator) => {
+    return denominator > 0 ? parseFloat(((numerator / denominator) * 100).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)) : 0
+  },
+  
+  // 등락률 계산
+  calculateChangeRate: (current, previous) => {
+    return previous > 0 ? parseFloat(((current / previous) * 100 - 100).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)) : 0
+  },
+  
+  // 시드 기반 랜덤 생성 (일관성 있는 데이터를 위해)
+  seededRandom: (seed) => {
+    const x = Math.sin(seed) * 10000
+    return x - Math.floor(x)
+  }
+}
+
+// 성과 데이터 생성 함수
+const generatePerformanceData = (baseData = {}) => {
+  const {
+    baseImpressions = utils.randomInt(CONFIG.RANDOM_RANGES.IMPRESSIONS.min, CONFIG.RANDOM_RANGES.IMPRESSIONS.max),
+    platform = 'general',
+    dateString = utils.formatDate(new Date()),
+    advertiserName = 'A광고주'
+  } = baseData
+
+  // 시드 생성 (일관성 있는 데이터를 위해)
+  const seed = dateString.split('-').join('') + platform.length
+  const seedValue = parseInt(seed) % 1000
+
+  const impressions = Math.floor(baseImpressions * (1 + (utils.seededRandom(seedValue) - 0.5) * 0.3))
+  const clickRate = utils.randomBetween(CONFIG.RANDOM_RANGES.CLICKS.min, CONFIG.RANDOM_RANGES.CLICKS.max)
+  const clicks = Math.floor(impressions * clickRate)
+  const conversionRate = utils.randomBetween(CONFIG.RANDOM_RANGES.CONVERSIONS.min, CONFIG.RANDOM_RANGES.CONVERSIONS.max)
+  const conversions = Math.floor(clicks * conversionRate)
+  const cpc = utils.randomInt(CONFIG.RANDOM_RANGES.CPC.min, CONFIG.RANDOM_RANGES.CPC.max)
+  const cost = Math.floor(clicks * cpc)
+  const revenueMultiplier = utils.randomBetween(CONFIG.RANDOM_RANGES.REVENUE_MULTIPLIER.min, CONFIG.RANDOM_RANGES.REVENUE_MULTIPLIER.max)
+  const revenue = Math.floor(cost * revenueMultiplier)
+
+  return {
+    impressions,
+    clicks,
+    conversions,
+    cost,
+    revenue,
+    cpc,
+    ctr: utils.calculatePercentage(clicks, impressions),
+    cvr: utils.calculatePercentage(conversions, clicks),
+    cpa: conversions > 0 ? Math.round(cost / conversions) : 0,
+    advertiser: advertiserName,
+    platform,
+    date: dateString
+  }
+}
+
+// 기간별 요약 데이터 계산 함수
+const calculatePeriodSummary = (data, previousData = null) => {
+  if (!data || data.length === 0) {
+    return {
+      totalImpressions: 0,
+      totalClicks: 0,
+      totalCost: 0,
+      totalConversions: 0,
+      avgCtr: 0,
+      avgCpc: 0,
+      avgCpa: 0,
+      changeRates: {}
+    }
+  }
+
+  const totals = data.reduce((acc, item) => ({
+    impressions: acc.impressions + (item.impressions || 0),
+    clicks: acc.clicks + (item.clicks || 0),
+    cost: acc.cost + (item.cost || 0),
+    conversions: acc.conversions + (item.conversions || 0)
+  }), { impressions: 0, clicks: 0, cost: 0, conversions: 0 })
+
+  const avgCtr = utils.calculatePercentage(totals.clicks, totals.impressions)
+  const avgCpc = totals.clicks > 0 ? Math.round(totals.cost / totals.clicks) : 0
+  const avgCpa = totals.conversions > 0 ? Math.round(totals.cost / totals.conversions) : 0
+
+  let changeRates = {}
+  if (previousData) {
+    const prevTotals = previousData.reduce((acc, item) => ({
+      impressions: acc.impressions + (item.impressions || 0),
+      clicks: acc.clicks + (item.clicks || 0),
+      cost: acc.cost + (item.cost || 0),
+      conversions: acc.conversions + (item.conversions || 0)
+    }), { impressions: 0, clicks: 0, cost: 0, conversions: 0 })
+
+    const prevAvgCpc = prevTotals.clicks > 0 ? Math.round(prevTotals.cost / prevTotals.clicks) : 0
+    const prevAvgCpa = prevTotals.conversions > 0 ? Math.round(prevTotals.cost / prevTotals.conversions) : 0
+
+    changeRates = {
+      cost: utils.calculateChangeRate(totals.cost, prevTotals.cost),
+      cpc: utils.calculateChangeRate(avgCpc, prevAvgCpc),
+      conversions: utils.calculateChangeRate(totals.conversions, prevTotals.conversions),
+      cpa: utils.calculateChangeRate(avgCpa, prevAvgCpa),
+      ctr: utils.calculateChangeRate(avgCtr, utils.calculatePercentage(prevTotals.clicks, prevTotals.impressions))
+    }
+  }
+
+  return {
+    totalImpressions: totals.impressions,
+    totalClicks: totals.clicks,
+    totalCost: totals.cost,
+    totalConversions: totals.conversions,
+    avgCtr,
+    avgCpc,
+    avgCpa,
+    changeRates
+  }
+}
+
+// 매체별 기본 데이터 설정
+const getMediaBaseData = (media) => {
+  const mediaConfigs = {
+    '네이버': { baseImpressions: 8000, multiplier: 1.0 },
+    '카카오': { baseImpressions: 6000, multiplier: 0.9 },
+    '구글': { baseImpressions: 10000, multiplier: 1.2 },
+    '페이스북': { baseImpressions: 7000, multiplier: 1.1 },
+    '틱톡': { baseImpressions: 12000, multiplier: 1.3 }
+  }
+  
+  return mediaConfigs[media] || { baseImpressions: 5000, multiplier: 1.0 }
+}
+
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('dashboard')
   const { user, selectedAdvertiser, hasPermission } = useAuth()
@@ -23,6 +200,20 @@ export default function Home() {
     }
   }, [currentPage, router])
 
+  // 네이버 페이지 처리
+  useEffect(() => {
+    if (currentPage === 'naver') {
+      router.push('/naver')
+    }
+  }, [currentPage, router])
+
+  // 카카오 페이지 처리
+  useEffect(() => {
+    if (currentPage === 'kakao') {
+      router.push('/kakao')
+    }
+  }, [currentPage, router])
+
   const renderContent = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -32,9 +223,23 @@ export default function Home() {
       case 'keyword-data':
         return <KeywordDataContent />
       case 'naver':
-        return <MediaContent media="네이버" />
+        return (
+          <div className="content-area">
+            <div className="loading-dashboard">
+              <div className="loading-spinner"></div>
+              <span className="loading-text">네이버 광고 페이지로 이동 중...</span>
+            </div>
+          </div>
+        )
       case 'kakao':
-        return <MediaContent media="카카오" />
+        return (
+          <div className="content-area">
+            <div className="loading-dashboard">
+              <div className="loading-spinner"></div>
+              <span className="loading-text">카카오 광고 페이지로 이동 중...</span>
+            </div>
+          </div>
+        )
       case 'google':
         return <MediaContent media="구글" />
       case 'facebook':
@@ -124,6 +329,7 @@ function MediaContent({ media }) {
     }
     
     const platform = platformMap[media]
+    const mediaConfig = getMediaBaseData(media)
     const adTypes = ['search', 'banner', 'video', 'shopping']
     
     // 틱톡 전용 광고 타입 추가
@@ -152,34 +358,27 @@ function MediaContent({ media }) {
     }
 
     const data = []
-    const dateCount = 30 // 30일치 데이터
 
-    for (let i = 0; i < dateCount; i++) {
-      const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-      const dateStr = date.toISOString().split('T')[0]
+    for (let i = 0; i < CONFIG.DATA_PERIOD_DAYS; i++) {
+      const date = utils.getDateOffset(i)
+      const dateStr = utils.formatDate(date)
 
       adTypes.forEach(adType => {
         campaigns.forEach(campaign => {
           adGroups.forEach(adGroup => {
-            // 랜덤 성과 데이터 생성
-            const impressions = Math.floor(Math.random() * 100000) + 1000
-            const clicks = Math.floor(impressions * (Math.random() * 0.1 + 0.01))
-            const conversions = Math.floor(clicks * (Math.random() * 0.2 + 0.01))
-            const cost = Math.floor((clicks * (Math.random() * 2000 + 100)))
-            const revenue = Math.floor(conversions * (Math.random() * 50000 + 10000))
+            // 개선된 성과 데이터 생성
+            const performanceData = generatePerformanceData({
+              baseImpressions: Math.floor(mediaConfig.baseImpressions * mediaConfig.multiplier),
+              platform,
+              dateString: dateStr,
+              advertiserName: selectedAdvertiser?.name || 'A광고주'
+            })
 
             data.push({
-              date: dateStr,
-              platform,
+              ...performanceData,
               adType,
               campaign,
-              adGroup,
-              impressions,
-              clicks,
-              conversions,
-              cost,
-              revenue,
-              advertiser: selectedAdvertiser?.name || 'A광고주'
+              adGroup
             })
           })
         })
@@ -347,13 +546,13 @@ function ReportsContent() {
         <p>지난 주 광고 성과를 요약한 보고서입니다.</p>
         <div className="report-data">
           <div className="report-item">
-            <span>총 노출수: 456,789</span>
+            <span>총 노출수: {utils.randomInt(300000, 800000).toLocaleString()}</span>
           </div>
           <div className="report-item">
-            <span>총 클릭수: 12,345</span>
+            <span>총 클릭수: {utils.randomInt(8000, 20000).toLocaleString()}</span>
           </div>
           <div className="report-item">
-            <span>총 광고비: ₩2,345,678</span>
+            <span>총 광고비: ₩{utils.randomInt(1500000, 3500000).toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -593,15 +792,15 @@ function PaymentsContent() {
       <div className="payment-stats">
         <div className="stat-card">
           <h4>이번 달 총 결제</h4>
-          <p className="stat-value">₩11,000,000</p>
+          <p className="stat-value">₩{utils.randomInt(8000000, 25000000).toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <h4>완료된 결제</h4>
-          <p className="stat-value">15건</p>
+          <p className="stat-value">{utils.randomInt(10, 30)}건</p>
         </div>
         <div className="stat-card">
           <h4>대기 중인 결제</h4>
-          <p className="stat-value">3건</p>
+          <p className="stat-value">{utils.randomInt(1, 8)}건</p>
         </div>
       </div>
 
@@ -663,18 +862,10 @@ function DailyDataContent() {
   const today = new Date()
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
   
-  // 로컬 시간 기준으로 YYYY-MM-DD 형식 변환
-  const formatLocalDate = (date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-  
   // 필터 상태 관리
   const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타', '틱톡'])
-  const [startDate, setStartDate] = useState(formatLocalDate(firstDayOfMonth))
-  const [endDate, setEndDate] = useState(formatLocalDate(today))
+  const [startDate, setStartDate] = useState(utils.formatDate(firstDayOfMonth))
+  const [endDate, setEndDate] = useState(utils.formatDate(today))
   
   // 검색 결과 상태 관리
   const [filteredKeywords, setFilteredKeywords] = useState([])
@@ -815,55 +1006,30 @@ function DailyDataContent() {
 
   // 특정 날짜의 매체별 데이터 생성 함수
   const generateMediaDataForDate = (date) => {
-    // 날짜를 기반으로 시드 생성 (일관된 데이터를 위해)
-    const dateStr = date.replace(/-/g, '')
-    const seed = parseInt(dateStr) % 1000
-    
-    const mediaBaseData = {
-      '네이버': { baseImpressions: 8000, baseClicks: 400, baseCost: 120000, baseConversions: 24 },
-      '카카오': { baseImpressions: 6000, baseClicks: 300, baseCost: 90000, baseConversions: 18 },
-      '구글': { baseImpressions: 10000, baseClicks: 500, baseCost: 150000, baseConversions: 30 },
-      '메타': { baseImpressions: 7000, baseClicks: 350, baseCost: 105000, baseConversions: 21 },
-      '틱톡': { baseImpressions: 12000, baseClicks: 600, baseCost: 180000, baseConversions: 36 }
-    }
-    
-    return ['네이버', '카카오', '구글', '메타', '틱톡'].map((media, index) => {
-      const base = mediaBaseData[media]
-      const variation = (seed + index * 100) % 50 - 25 // -25% ~ +25% 변동
-      const factor = 1 + (variation / 100)
+    return ['네이버', '카카오', '구글', '메타', '틱톡'].map((media) => {
+      const mediaConfig = getMediaBaseData(media)
       
-             const impressions = Math.floor(base.baseImpressions * factor)
-       const clicks = Math.floor(base.baseClicks * factor)
-       const cost = Math.floor(base.baseCost * factor)
-       const conversions = Math.floor(base.baseConversions * factor)
-       const ctr = impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(1)) : 0
-       const cpc = clicks > 0 ? Math.round(cost / clicks) : 0
-       const cpa = conversions > 0 ? Math.round(cost / conversions) : 0
-       const cvr = clicks > 0 ? parseFloat(((conversions / clicks) * 100).toFixed(1)) : 0
-       
-       return {
-         date,
-         media,
-         campaign: `${media} 일자별 캠페인`,
-         impressions,
-         clicks,
-         ctr,
-         cpc,
-         cost,
-         conversions,
-         cpa,
-         cvr,
-         revenue: Math.floor(cost * 1.8) // 수익은 광고비의 1.8배로 가정
-       }
+      const performanceData = generatePerformanceData({
+        baseImpressions: mediaConfig.baseImpressions,
+        platform: media.toLowerCase(),
+        dateString: date,
+        advertiserName: selectedAdvertiser?.name || 'A광고주'
+      })
+      
+      return {
+        ...performanceData,
+        media,
+        campaign: `${media} 일자별 캠페인`
+      }
     })
   }
 
   // 일자별 데이터 생성 (매체별 데이터의 합산)
   const generateDailyData = () => {
     const data = []
-    for (let i = 30; i >= 0; i--) {
-      const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-      const dateStr = date.toISOString().split('T')[0]
+    for (let i = CONFIG.DATA_PERIOD_DAYS; i >= 0; i--) {
+      const date = utils.getDateOffset(i)
+      const dateStr = utils.formatDate(date)
       
       // 해당 날짜의 매체별 데이터 생성
       const mediaData = generateMediaDataForDate(dateStr)
@@ -876,10 +1042,10 @@ function DailyDataContent() {
       const totalRevenue = mediaData.reduce((sum, item) => sum + item.revenue, 0)
       
       // 계산된 지표
-      const ctr = totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(1)) : 0
+      const ctr = utils.calculatePercentage(totalClicks, totalImpressions)
       const cpc = totalClicks > 0 ? Math.round(totalCost / totalClicks) : 0
       const cpa = totalConversions > 0 ? Math.round(totalCost / totalConversions) : 0
-      const cvr = totalClicks > 0 ? parseFloat(((totalConversions / totalClicks) * 100).toFixed(1)) : 0
+      const cvr = utils.calculatePercentage(totalConversions, totalClicks)
       
       data.push({
         date: dateStr,
@@ -970,42 +1136,43 @@ function DailyDataContent() {
   const calculatePeriodSummary = (data) => {
     // 데이터가 비어있거나 없을 때 기본값 설정
     if (!data || data.length === 0) {
-      const defaultData = {
-        totalImpressions: 45000,
-        totalClicks: 2250,
-        totalCost: 540000,
-        totalConversions: 270,
-        avgCtr: 5.0,
-        avgCpc: 240,
-        avgCpa: 2000
-      }
+      const defaultData = generatePerformanceData({
+        baseImpressions: utils.randomInt(40000, 80000),
+        platform: 'mixed',
+        dateString: utils.formatDate(new Date()),
+        advertiserName: selectedAdvertiser?.name || 'A광고주'
+      })
+      
+      // 전일 데이터 생성
+      const yesterdayVariation = utils.randomBetween(0.85, 0.95)
+      const todayVariation = utils.randomBetween(1.05, 1.15)
       
       return {
         ...defaultData,
         // 전일 데이터
-        totalCostYesterday: Math.floor(defaultData.totalCost * 0.92),
-        totalConversionsYesterday: Math.floor(defaultData.totalConversions * 0.85),
-        avgCpcYesterday: Math.floor(defaultData.avgCpc * 1.08),
-        avgCpaYesterday: Math.floor(defaultData.avgCpa * 1.12),
-        avgCtrYesterday: parseFloat((defaultData.avgCtr * 0.94).toFixed(1)),
+        totalCostYesterday: Math.floor(defaultData.cost * yesterdayVariation),
+        totalConversionsYesterday: Math.floor(defaultData.conversions * yesterdayVariation),
+        avgCpcYesterday: Math.floor(defaultData.cpc * (1 / yesterdayVariation)),
+        avgCpaYesterday: Math.floor(defaultData.cpa * (1 / yesterdayVariation)),
+        avgCtrYesterday: parseFloat((defaultData.ctr * yesterdayVariation).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)),
         // 당일 데이터
-        totalCostToday: defaultData.totalCost,
+        totalCostToday: Math.floor(defaultData.cost * todayVariation),
         // 등락률
-        costChangeRate: 8.7,
-        cpcChangeRate: -7.4,
-        conversionChangeRate: 17.6,
-        cpaChangeRate: -10.7,
-        ctrChangeRate: 6.4
+        costChangeRate: utils.calculateChangeRate(defaultData.cost * todayVariation, defaultData.cost * yesterdayVariation),
+        cpcChangeRate: utils.calculateChangeRate(defaultData.cpc, defaultData.cpc * (1 / yesterdayVariation)),
+        conversionChangeRate: utils.calculateChangeRate(defaultData.conversions * todayVariation, defaultData.conversions * yesterdayVariation),
+        cpaChangeRate: utils.calculateChangeRate(defaultData.cpa, defaultData.cpa * (1 / yesterdayVariation)),
+        ctrChangeRate: utils.calculateChangeRate(defaultData.ctr * todayVariation, defaultData.ctr * yesterdayVariation)
       }
     }
     
     const totalImpressions = data.reduce((sum, item) => sum + item.impressions, 0)
     const totalClicks = data.reduce((sum, item) => sum + item.clicks, 0)
     const totalCost = data.reduce((sum, item) => sum + item.cost, 0)
-    const totalConversions = Math.floor(totalClicks * 0.12) // 전환수는 클릭수의 12%로 가정
+    const totalConversions = data.reduce((sum, item) => sum + (item.conversions || 0), 0)
     
     // 평균 CTR 계산 (전체 클릭수 / 전체 노출수)
-    const avgCtr = totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(1)) : 0
+    const avgCtr = utils.calculatePercentage(totalClicks, totalImpressions)
     
     // 평균 CPC 계산 (전체 광고비 / 전체 클릭수)
     const avgCpc = totalClicks > 0 ? Math.round(totalCost / totalClicks) : 0
@@ -1025,81 +1192,86 @@ function DailyDataContent() {
       clicks: totalClicks
     }
     
-    // 전일 데이터 (당일 대비 5~10% 감소)
+    // 전일 데이터 (당일 대비 변동)
+    const yesterdayVariation = utils.randomBetween(0.85, 0.95)
     const yesterdayData = {
-      cost: Math.floor(totalCost * 0.92),
-      cpc: Math.floor(avgCpc * 1.08),
-      conversions: Math.floor(totalConversions * 0.85),
-      cpa: Math.floor(avgCpa * 1.12),
-      ctr: parseFloat((avgCtr * 0.94).toFixed(1)),
-      impressions: Math.floor(totalImpressions * 0.88),
-      clicks: Math.floor(totalClicks * 0.92)
+      cost: Math.floor(totalCost * yesterdayVariation),
+      cpc: Math.floor(avgCpc * (1 / yesterdayVariation)),
+      conversions: Math.floor(totalConversions * yesterdayVariation),
+      cpa: Math.floor(avgCpa * (1 / yesterdayVariation)),
+      ctr: parseFloat((avgCtr * yesterdayVariation).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)),
+      impressions: Math.floor(totalImpressions * yesterdayVariation),
+      clicks: Math.floor(totalClicks * yesterdayVariation)
     }
     
-    // 최근 7일 데이터 (이전 7일 대비 3~7% 증가)
+    // 최근 7일 데이터 (이전 7일 대비 변동)
+    const recent7DaysMultiplier = utils.randomBetween(6.8, 7.5)
     const recent7DaysData = {
-      cost: Math.floor(totalCost * 7.2),
-      cpc: Math.floor(avgCpc * 1.03),
-      conversions: Math.floor(totalConversions * 7.5),
-      cpa: Math.floor(avgCpa * 0.96),
-      ctr: parseFloat((avgCtr * 1.01).toFixed(1)),
-      impressions: Math.floor(totalImpressions * 6.9),
-      clicks: Math.floor(totalClicks * 7.0)
+      cost: Math.floor(totalCost * recent7DaysMultiplier),
+      cpc: Math.floor(avgCpc * utils.randomBetween(0.98, 1.05)),
+      conversions: Math.floor(totalConversions * recent7DaysMultiplier),
+      cpa: Math.floor(avgCpa * utils.randomBetween(0.93, 1.07)),
+      ctr: parseFloat((avgCtr * utils.randomBetween(0.98, 1.03)).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)),
+      impressions: Math.floor(totalImpressions * utils.randomBetween(6.5, 7.2)),
+      clicks: Math.floor(totalClicks * utils.randomBetween(6.8, 7.3))
     }
     
     // 이전 7일 데이터
+    const prev7DaysMultiplier = utils.randomBetween(6.2, 6.8)
     const prev7DaysData = {
-      cost: Math.floor(totalCost * 6.8),
-      cpc: Math.floor(avgCpc * 1.12),
-      conversions: Math.floor(totalConversions * 6.5),
-      cpa: Math.floor(avgCpa * 1.07),
-      ctr: parseFloat((avgCtr * 1.05).toFixed(1)),
-      impressions: Math.floor(totalImpressions * 6.2),
-      clicks: Math.floor(totalClicks * 6.5)
+      cost: Math.floor(totalCost * prev7DaysMultiplier),
+      cpc: Math.floor(avgCpc * utils.randomBetween(1.05, 1.15)),
+      conversions: Math.floor(totalConversions * prev7DaysMultiplier),
+      cpa: Math.floor(avgCpa * utils.randomBetween(1.02, 1.12)),
+      ctr: parseFloat((avgCtr * utils.randomBetween(1.02, 1.08)).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)),
+      impressions: Math.floor(totalImpressions * utils.randomBetween(5.8, 6.5)),
+      clicks: Math.floor(totalClicks * utils.randomBetween(6.0, 6.8))
     }
     
-    // 당월 데이터 (전월 대비 8~12% 감소)
+    // 당월 데이터 (전월 대비 변동)
+    const currentMonthMultiplier = utils.randomBetween(27.0, 30.0)
     const currentMonthData = {
-      cost: Math.floor(totalCost * 28.5),
-      cpc: Math.floor(avgCpc * 0.97),
-      conversions: Math.floor(totalConversions * 28.0),
-      cpa: Math.floor(avgCpa * 1.02),
-      ctr: parseFloat((avgCtr * 1.03).toFixed(1)),
-      impressions: Math.floor(totalImpressions * 29.3),
-      clicks: Math.floor(totalClicks * 30.1)
+      cost: Math.floor(totalCost * currentMonthMultiplier),
+      cpc: Math.floor(avgCpc * utils.randomBetween(0.95, 1.05)),
+      conversions: Math.floor(totalConversions * currentMonthMultiplier),
+      cpa: Math.floor(avgCpa * utils.randomBetween(0.98, 1.08)),
+      ctr: parseFloat((avgCtr * utils.randomBetween(0.98, 1.05)).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)),
+      impressions: Math.floor(totalImpressions * utils.randomBetween(28.0, 31.0)),
+      clicks: Math.floor(totalClicks * utils.randomBetween(28.5, 31.5))
     }
     
     // 전월 데이터
+    const prevMonthMultiplier = utils.randomBetween(29.0, 33.0)
     const prevMonthData = {
-      cost: Math.floor(totalCost * 31.2),
-      cpc: Math.floor(avgCpc * 1.05),
-      conversions: Math.floor(totalConversions * 31.8),
-      cpa: Math.floor(avgCpa * 0.98),
-      ctr: parseFloat((avgCtr * 0.94).toFixed(1)),
-      impressions: Math.floor(totalImpressions * 32.1),
-      clicks: Math.floor(totalClicks * 30.2)
+      cost: Math.floor(totalCost * prevMonthMultiplier),
+      cpc: Math.floor(avgCpc * utils.randomBetween(1.02, 1.08)),
+      conversions: Math.floor(totalConversions * prevMonthMultiplier),
+      cpa: Math.floor(avgCpa * utils.randomBetween(0.95, 1.03)),
+      ctr: parseFloat((avgCtr * utils.randomBetween(0.92, 0.98)).toFixed(CONFIG.DISPLAY.DECIMAL_PLACES)),
+      impressions: Math.floor(totalImpressions * utils.randomBetween(30.0, 34.0)),
+      clicks: Math.floor(totalClicks * utils.randomBetween(29.0, 32.0))
     }
     
-    // 등락률 계산 (당일/전일 * 100 - 100)
-    const costChangeRate = yesterdayData.cost > 0 ? ((todayData.cost / yesterdayData.cost) * 100 - 100) : 0
-    const cpcChangeRate = yesterdayData.cpc > 0 ? ((todayData.cpc / yesterdayData.cpc) * 100 - 100) : 0
-    const conversionChangeRate = yesterdayData.conversions > 0 ? ((todayData.conversions / yesterdayData.conversions) * 100 - 100) : 0
-    const cpaChangeRate = yesterdayData.cpa > 0 ? ((todayData.cpa / yesterdayData.cpa) * 100 - 100) : 0
-    const ctrChangeRate = yesterdayData.ctr > 0 ? ((todayData.ctr / yesterdayData.ctr) * 100 - 100) : 0
+    // 등락률 계산 (당일/전일)
+    const costChangeRate = utils.calculateChangeRate(todayData.cost, yesterdayData.cost)
+    const cpcChangeRate = utils.calculateChangeRate(todayData.cpc, yesterdayData.cpc)
+    const conversionChangeRate = utils.calculateChangeRate(todayData.conversions, yesterdayData.conversions)
+    const cpaChangeRate = utils.calculateChangeRate(todayData.cpa, yesterdayData.cpa)
+    const ctrChangeRate = utils.calculateChangeRate(todayData.ctr, yesterdayData.ctr)
     
-    // 7일 기간 등락률 계산 (최근7일/이전7일 * 100 - 100)
-    const cost7DaysChangeRate = prev7DaysData.cost > 0 ? ((recent7DaysData.cost / prev7DaysData.cost) * 100 - 100) : 0
-    const cpc7DaysChangeRate = prev7DaysData.cpc > 0 ? ((recent7DaysData.cpc / prev7DaysData.cpc) * 100 - 100) : 0
-    const conversion7DaysChangeRate = prev7DaysData.conversions > 0 ? ((recent7DaysData.conversions / prev7DaysData.conversions) * 100 - 100) : 0
-    const cpa7DaysChangeRate = prev7DaysData.cpa > 0 ? ((recent7DaysData.cpa / prev7DaysData.cpa) * 100 - 100) : 0
-    const ctr7DaysChangeRate = prev7DaysData.ctr > 0 ? ((recent7DaysData.ctr / prev7DaysData.ctr) * 100 - 100) : 0
+    // 7일 기간 등락률 계산 (최근7일/이전7일)
+    const cost7DaysChangeRate = utils.calculateChangeRate(recent7DaysData.cost, prev7DaysData.cost)
+    const cpc7DaysChangeRate = utils.calculateChangeRate(recent7DaysData.cpc, prev7DaysData.cpc)
+    const conversion7DaysChangeRate = utils.calculateChangeRate(recent7DaysData.conversions, prev7DaysData.conversions)
+    const cpa7DaysChangeRate = utils.calculateChangeRate(recent7DaysData.cpa, prev7DaysData.cpa)
+    const ctr7DaysChangeRate = utils.calculateChangeRate(recent7DaysData.ctr, prev7DaysData.ctr)
     
-    // 월 기간 등락률 계산 (당월/전월 * 100 - 100)
-    const costMonthChangeRate = prevMonthData.cost > 0 ? ((currentMonthData.cost / prevMonthData.cost) * 100 - 100) : 0
-    const cpcMonthChangeRate = prevMonthData.cpc > 0 ? ((currentMonthData.cpc / prevMonthData.cpc) * 100 - 100) : 0
-    const conversionMonthChangeRate = prevMonthData.conversions > 0 ? ((currentMonthData.conversions / prevMonthData.conversions) * 100 - 100) : 0
-    const cpaMonthChangeRate = prevMonthData.cpa > 0 ? ((currentMonthData.cpa / prevMonthData.cpa) * 100 - 100) : 0
-    const ctrMonthChangeRate = prevMonthData.ctr > 0 ? ((currentMonthData.ctr / prevMonthData.ctr) * 100 - 100) : 0
+    // 월 기간 등락률 계산 (당월/전월)
+    const costMonthChangeRate = utils.calculateChangeRate(currentMonthData.cost, prevMonthData.cost)
+    const cpcMonthChangeRate = utils.calculateChangeRate(currentMonthData.cpc, prevMonthData.cpc)
+    const conversionMonthChangeRate = utils.calculateChangeRate(currentMonthData.conversions, prevMonthData.conversions)
+    const cpaMonthChangeRate = utils.calculateChangeRate(currentMonthData.cpa, prevMonthData.cpa)
+    const ctrMonthChangeRate = utils.calculateChangeRate(currentMonthData.ctr, prevMonthData.ctr)
     
     return {
       totalImpressions,
@@ -1910,24 +2082,14 @@ function KeywordDataContent() {
   const { selectedAdvertiser } = useAuth()
   
   // 어제 날짜 계산 (로컬 시간 기준)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  
-  // 로컬 시간 기준으로 YYYY-MM-DD 형식 변환
-  const formatLocalDate = (date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
+  const yesterday = utils.getDateOffset(1)
   
   // 필터 상태 관리
   const [selectedMedias, setSelectedMedias] = useState(['네이버', '카카오', '구글', '메타', '틱톡'])
   const [keywordMetric, setKeywordMetric] = useState('광고비')
   const [sortOrder, setSortOrder] = useState('내림차순')
   const [keywordCount, setKeywordCount] = useState('')
-  const [selectedDate, setSelectedDate] = useState(formatLocalDate(yesterday))
+  const [selectedDate, setSelectedDate] = useState(utils.formatDate(yesterday))
   const [costRangeMin, setCostRangeMin] = useState('')
   const [costRangeMax, setCostRangeMax] = useState('')
   
@@ -2121,62 +2283,88 @@ function KeywordDataContent() {
     setPeriodSummary(summary)
   }, [])
 
-  // 키워드 고정 더미 데이터 생성
+  // 키워드 데이터 생성
   const generateKeywordData = () => {
-    const fixedKeywordData = [
-      { keyword: '브랜드명', media: '네이버', campaign: '네이버 브랜드 캠페인', adGroup: '네이버 브랜드 키워드', impressions: 15000, clicks: 750, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 130000, cost_yesterday: 128000, cost_7days: 320000, cost_last_week: 325000 },
-              { keyword: '브랜드명', media: '구글', campaign: '구글 브랜드 캠페인', adGroup: '구글 브랜드 키워드', impressions: 12000, clicks: 600, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 120000, cost_yesterday: 118000, cost_7days: 280000, cost_last_week: 285000 },
-              { keyword: '브랜드명', media: '카카오', campaign: '카카오 브랜드 캠페인', adGroup: '카카오 브랜드 키워드', impressions: 10000, clicks: 500, ctr: 5.0, cpc_today: 380, cpc_yesterday: 375, cpc_7days: 378, cpc_last_week: 382, cost_today: 110000, cost_yesterday: 108000, cost_7days: 240000, cost_last_week: 245000 },
-        { keyword: '브랜드명', media: '메타', campaign: '메타 브랜드 캠페인', adGroup: '메타 브랜드 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 400, cpc_yesterday: 395, cpc_7days: 398, cpc_last_week: 402, cost_today: 100000, cost_yesterday: 108000, cost_7days: 200000, cost_last_week: 205000 },
-      { keyword: '브랜드명', media: '틱톡', campaign: '틱톡 브랜드 캠페인', adGroup: '틱톡 브랜드 키워드', impressions: 50000, clicks: 2500, ctr: 5.0, cpc_today: 180, cpc_yesterday: 175, cpc_7days: 178, cpc_last_week: 182, cost_today: 150000, cost_yesterday: 148000, cost_7days: 600000, cost_last_week: 605000 },
-      
-      { keyword: '제품명', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 18000, clicks: 900, ctr: 5.0, cpc_today: 280, cpc_yesterday: 275, cpc_7days: 278, cpc_last_week: 282, cost_today: 95000, cost_yesterday: 92000, cost_7days: 380000, cost_last_week: 385000 },
-      { keyword: '제품명', media: '카카오', campaign: '카카오 제품 캠페인', adGroup: '카카오 제품 키워드', impressions: 14000, clicks: 700, ctr: 5.0, cpc_today: 300, cpc_yesterday: 295, cpc_7days: 298, cpc_last_week: 302, cost_today: 75000, cost_yesterday: 73000, cost_7days: 300000, cost_last_week: 305000 },
-      { keyword: '제품명', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 68000, cost_yesterday: 66000, cost_7days: 270000, cost_last_week: 275000 },
-      { keyword: '제품명', media: '메타', campaign: '메타 제품 캠페인', adGroup: '메타 제품 키워드', impressions: 9000, clicks: 450, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 55000, cost_yesterday: 53000, cost_7days: 220000, cost_last_week: 225000 },
-      { keyword: '제품명', media: '틱톡', campaign: '틱톡 제품 캠페인', adGroup: '틱톡 제품 키워드', impressions: 45000, clicks: 2250, ctr: 5.0, cpc_today: 200, cpc_yesterday: 195, cpc_7days: 198, cpc_last_week: 202, cost_today: 140000, cost_yesterday: 138000, cost_7days: 560000, cost_last_week: 565000 },
-      
-      { keyword: '카테고리', media: '구글', campaign: '구글 카테고리 캠페인', adGroup: '구글 핵심 키워드', impressions: 20000, clicks: 1000, ctr: 5.0, cpc_today: 250, cpc_yesterday: 245, cpc_7days: 248, cpc_last_week: 252, cost_today: 100000, cost_yesterday: 98000, cost_7days: 400000, cost_last_week: 405000 },
-      { keyword: '카테고리', media: '메타', campaign: '메타 카테고리 캠페인', adGroup: '메타 핵심 키워드', impressions: 16000, clicks: 800, ctr: 5.0, cpc_today: 275, cpc_yesterday: 270, cpc_7days: 273, cpc_last_week: 277, cost_today: 85000, cost_yesterday: 83000, cost_7days: 340000, cost_last_week: 345000 },
-      { keyword: '카테고리', media: '네이버', campaign: '네이버 카테고리 캠페인', adGroup: '네이버 핵심 키워드', impressions: 13000, clicks: 650, ctr: 5.0, cpc_today: 290, cpc_yesterday: 285, cpc_7days: 288, cpc_last_week: 292, cost_today: 72000, cost_yesterday: 70000, cost_7days: 290000, cost_last_week: 295000 },
-      { keyword: '카테고리', media: '카카오', campaign: '카카오 카테고리 캠페인', adGroup: '카카오 핵심 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 310, cpc_yesterday: 305, cpc_7days: 308, cpc_last_week: 312, cost_today: 64000, cost_yesterday: 62000, cost_7days: 250000, cost_last_week: 255000 },
-      { keyword: '카테고리', media: '틱톡', campaign: '틱톡 카테고리 캠페인', adGroup: '틱톡 카테고리 키워드', impressions: 40000, clicks: 2000, ctr: 5.0, cpc_today: 170, cpc_yesterday: 165, cpc_7days: 168, cpc_last_week: 172, cost_today: 130000, cost_yesterday: 128000, cost_7days: 520000, cost_last_week: 525000 },
-      
-      { keyword: '경쟁사', media: '네이버', campaign: '네이버 브랜드 캠페인', adGroup: '네이버 브랜드 키워드', impressions: 10000, clicks: 500, ctr: 5.0, cpc_today: 400, cpc_yesterday: 395, cpc_7days: 398, cpc_last_week: 402, cost_today: 65000, cost_yesterday: 63000, cost_7days: 260000, cost_last_week: 265000 },
-      { keyword: '경쟁사', media: '구글', campaign: '구글 브랜드 캠페인', adGroup: '구글 브랜드 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 420, cpc_yesterday: 415, cpc_7days: 418, cpc_last_week: 422, cost_today: 58000, cost_yesterday: 56000, cost_7days: 230000, cost_last_week: 235000 },
-      
-      { keyword: '일반키워드', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 22000, clicks: 1100, ctr: 5.0, cpc_today: 230, cpc_yesterday: 225, cpc_7days: 228, cpc_last_week: 232, cost_today: 110000, cost_yesterday: 108000, cost_7days: 440000, cost_last_week: 445000 },
-      { keyword: '일반키워드', media: '카카오', campaign: '카카오 제품 캠페인', adGroup: '카카오 제품 키워드', impressions: 13000, clicks: 650, ctr: 5.0, cpc_today: 260, cpc_yesterday: 255, cpc_7days: 258, cpc_last_week: 262, cost_today: 72000, cost_yesterday: 70000, cost_7days: 290000, cost_last_week: 295000 },
-      
-      { keyword: '롱테일키워드', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 8000, clicks: 400, ctr: 5.0, cpc_today: 350, cpc_yesterday: 345, cpc_7days: 348, cpc_last_week: 352, cost_today: 55000, cost_yesterday: 53000, cost_7days: 220000, cost_last_week: 225000 },
-      
-      { keyword: '상품후기', media: '메타', campaign: '메타 브랜드 캠페인', adGroup: '메타 브랜드 키워드', impressions: 12000, clicks: 600, ctr: 5.0, cpc_today: 300, cpc_yesterday: 295, cpc_7days: 298, cpc_last_week: 302, cost_today: 68000, cost_yesterday: 66000, cost_7days: 270000, cost_last_week: 275000 },
-      
-      { keyword: '가격비교', media: '구글', campaign: '구글 제품 캠페인', adGroup: '구글 제품 키워드', impressions: 17000, clicks: 850, ctr: 5.0, cpc_today: 290, cpc_yesterday: 285, cpc_7days: 288, cpc_last_week: 292, cost_today: 88000, cost_yesterday: 86000, cost_7days: 350000, cost_last_week: 355000 },
-      { keyword: '가격비교', media: '네이버', campaign: '네이버 제품 캠페인', adGroup: '네이버 제품 키워드', impressions: 11000, clicks: 550, ctr: 5.0, cpc_today: 320, cpc_yesterday: 315, cpc_7days: 318, cpc_last_week: 322, cost_today: 64000, cost_yesterday: 62000, cost_7days: 250000, cost_last_week: 255000 },
-      
-      { keyword: '이벤트', media: '카카오', campaign: '카카오 카테고리 캠페인', adGroup: '카카오 핵심 키워드', impressions: 25000, clicks: 1250, ctr: 5.0, cpc_today: 200, cpc_yesterday: 195, cpc_7days: 198, cpc_last_week: 202, cost_today: 120000, cost_yesterday: 118000, cost_7days: 480000, cost_last_week: 485000 },
-      
-      { keyword: '할인', media: '메타', campaign: '메타 제품 캠페인', adGroup: '메타 제품 키워드', impressions: 19000, clicks: 950, ctr: 5.0, cpc_today: 260, cpc_yesterday: 255, cpc_7days: 258, cpc_last_week: 262, cost_today: 95000, cost_yesterday: 93000, cost_7days: 380000, cost_last_week: 385000 },
-      
-      // 틱톡 전용 키워드 데이터 추가
-      { keyword: '챌린지', media: '틱톡', campaign: '틱톡 바이럴 챌린지', adGroup: '틱톡 해시태그 키워드', impressions: 80000, clicks: 4000, ctr: 5.0, cpc_today: 150, cpc_yesterday: 145, cpc_7days: 148, cpc_last_week: 152, cost_today: 200000, cost_yesterday: 198000, cost_7days: 800000, cost_last_week: 805000 },
-      { keyword: '댄스', media: '틱톡', campaign: '틱톡 댄스 챌린지', adGroup: '틱톡 댄스 키워드', impressions: 75000, clicks: 3750, ctr: 5.0, cpc_today: 160, cpc_yesterday: 155, cpc_7days: 158, cpc_last_week: 162, cost_today: 180000, cost_yesterday: 178000, cost_7days: 720000, cost_last_week: 725000 },
-      { keyword: '트렌드', media: '틱톡', campaign: '틱톡 트렌드 마케팅', adGroup: '틱톡 트렌드 키워드', impressions: 60000, clicks: 3000, ctr: 5.0, cpc_today: 190, cpc_yesterday: 185, cpc_7days: 188, cpc_last_week: 192, cost_today: 170000, cost_yesterday: 168000, cost_7days: 680000, cost_last_week: 685000 },
-      { keyword: '바이럴', media: '틱톡', campaign: '틱톡 바이럴 마케팅', adGroup: '틱톡 바이럴 키워드', impressions: 65000, clicks: 3250, ctr: 5.0, cpc_today: 175, cpc_yesterday: 170, cpc_7days: 173, cpc_last_week: 177, cost_today: 160000, cost_yesterday: 158000, cost_7days: 640000, cost_last_week: 645000 },
-      { keyword: '인플루언서', media: '틱톡', campaign: '틱톡 인플루언서 콜라보', adGroup: '틱톡 인플루언서 키워드', impressions: 55000, clicks: 2750, ctr: 5.0, cpc_today: 210, cpc_yesterday: 205, cpc_7days: 208, cpc_last_week: 212, cost_today: 190000, cost_yesterday: 188000, cost_7days: 760000, cost_last_week: 765000 }
+    const keywordTemplates = [
+      { keyword: '브랜드명', category: '브랜드', priority: 1 },
+      { keyword: '제품명', category: '제품', priority: 2 },
+      { keyword: '카테고리', category: '카테고리', priority: 3 },
+      { keyword: '경쟁사', category: '브랜드', priority: 4 },
+      { keyword: '일반키워드', category: '일반', priority: 5 },
+      { keyword: '롱테일키워드', category: '일반', priority: 6 },
+      { keyword: '상품후기', category: '정보', priority: 7 },
+      { keyword: '가격비교', category: '구매', priority: 8 },
+      { keyword: '이벤트', category: '프로모션', priority: 9 },
+      { keyword: '할인', category: '프로모션', priority: 10 },
+      { keyword: '챌린지', category: '트렌드', priority: 11 },
+      { keyword: '댄스', category: '트렌드', priority: 12 },
+      { keyword: '트렌드', category: '트렌드', priority: 13 },
+      { keyword: '바이럴', category: '트렌드', priority: 14 },
+      { keyword: '인플루언서', category: '트렌드', priority: 15 }
     ]
     
-    // 모든 키워드 데이터의 광고비가 0원이 되지 않도록 하고, 전환수를 적절히 설정
-    return fixedKeywordData.map(item => ({
-      ...item,
-      cost_today: Math.max(50000, item.cost_today),
-      cost_yesterday: Math.max(50000, item.cost_yesterday),
-      cost_7days: Math.max(50000, item.cost_7days),
-      cost_last_week: Math.max(50000, item.cost_last_week),
-      // 전환수는 클릭수의 8%로 설정하되 1,000개 미만으로 제한
-      conversions: Math.min(999, Math.floor(item.clicks * 0.08))
-    }))
+    const mediaList = ['네이버', '카카오', '구글', '메타', '틱톡']
+    const data = []
+    
+    keywordTemplates.forEach(template => {
+      mediaList.forEach(media => {
+        // 틱톡 전용 키워드는 틱톡에만 적용
+        if (template.category === '트렌드' && media !== '틱톡') return
+        
+        const mediaConfig = getMediaBaseData(media)
+        const baseImpressions = Math.floor(mediaConfig.baseImpressions * utils.randomBetween(0.8, 1.5))
+        
+        const performanceToday = generatePerformanceData({
+          baseImpressions,
+          platform: media.toLowerCase(),
+          dateString: utils.formatDate(new Date()),
+          advertiserName: selectedAdvertiser?.name || 'A광고주'
+        })
+        
+        const performanceYesterday = generatePerformanceData({
+          baseImpressions: Math.floor(baseImpressions * utils.randomBetween(0.9, 1.1)),
+          platform: media.toLowerCase(),
+          dateString: utils.formatDate(utils.getDateOffset(1)),
+          advertiserName: selectedAdvertiser?.name || 'A광고주'
+        })
+        
+        const performance7Days = generatePerformanceData({
+          baseImpressions: Math.floor(baseImpressions * utils.randomBetween(6.5, 7.5)),
+          platform: media.toLowerCase(),
+          dateString: utils.formatDate(utils.getDateOffset(7)),
+          advertiserName: selectedAdvertiser?.name || 'A광고주'
+        })
+        
+        const performanceLastWeek = generatePerformanceData({
+          baseImpressions: Math.floor(baseImpressions * utils.randomBetween(6.0, 7.0)),
+          platform: media.toLowerCase(),
+          dateString: utils.formatDate(utils.getDateOffset(14)),
+          advertiserName: selectedAdvertiser?.name || 'A광고주'
+        })
+        
+        data.push({
+          keyword: template.keyword,
+          media,
+          campaign: `${media} ${template.category} 캠페인`,
+          adGroup: `${media} ${template.category} 키워드`,
+          impressions: performanceToday.impressions,
+          clicks: performanceToday.clicks,
+          ctr: performanceToday.ctr,
+          cpc_today: performanceToday.cpc,
+          cpc_yesterday: performanceYesterday.cpc,
+          cpc_7days: performance7Days.cpc,
+          cpc_last_week: performanceLastWeek.cpc,
+          cost_today: performanceToday.cost,
+          cost_yesterday: performanceYesterday.cost,
+          cost_7days: performance7Days.cost,
+          cost_last_week: performanceLastWeek.cost,
+          conversions: performanceToday.conversions,
+          priority: template.priority
+        })
+      })
+    })
+    
+    return data.sort((a, b) => a.priority - b.priority)
   }
 
   // 키워드 데이터 필터링 및 정렬
