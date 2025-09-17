@@ -1,4 +1,4 @@
-/* 키워드 관리 컴포넌트 스타일 */
+/* 광고주 관리 컴포넌트 스타일 */
 
 .tableContainer {
   background: white;
@@ -60,7 +60,7 @@
 }
 
 .historyButton {
-  background: #007bff;
+  background: #6366f1;
   color: white;
   border: none;
   border-radius: 4px;
@@ -71,7 +71,7 @@
 }
 
 .historyButton:hover {
-  background: #0056b3;
+  background: #4f46e5;
 }
 
 .emptyResults {
@@ -247,6 +247,11 @@
   font-size: 0.85rem;
 }
 
+.historyTable td:nth-child(4) {
+  width: 120px;
+  white-space: nowrap;
+}
+
 .emptyHistory {
   text-align: center;
   padding: 40px;
@@ -261,7 +266,7 @@
 }
 
 .addButton {
-  background: #28a745;
+  background: #667eea;
   color: white;
   border: none;
   border-radius: 4px;
@@ -272,7 +277,7 @@
 }
 
 .addButton:hover:not(:disabled) {
-  background: #218838;
+  background: #5a6fd8;
 }
 
 .addButton:disabled {
@@ -310,10 +315,23 @@
   display: flex;
   gap: 6px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.charCount {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 500;
+  padding: 2px 6px;
+  background: #f8f9fa;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+  min-width: 45px;
+  text-align: center;
 }
 
 .saveButton {
-  background: #007bff;
+  background: #6366f1;
   color: white;
   border: none;
   border-radius: 4px;
@@ -324,7 +342,7 @@
 }
 
 .saveButton:hover:not(:disabled) {
-  background: #0056b3;
+  background: #4f46e5;
 }
 
 .saveButton:disabled {

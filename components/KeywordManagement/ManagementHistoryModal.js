@@ -4,6 +4,8 @@ import styles from '../../styles/components/KeywordManagement.module.css'
 const ManagementHistoryModal = ({ keyword, onClose }) => {
   const [newEntry, setNewEntry] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editContent, setEditContent] = useState('')
   const formatDateTime = (dateString) => {
     if (!dateString) return '-'
     const date = new Date(dateString)
@@ -18,7 +20,7 @@ const ManagementHistoryModal = ({ keyword, onClose }) => {
   }
 
   const handleSaveEntry = () => {
-    if (newEntry.trim()) {
+    if (newEntry.trim() && newEntry.length <= 100) {
       // 실제 구현에서는 여기서 API 호출하여 서버에 저장
       console.log('새 관리 내역 추가:', newEntry)
       setIsAdding(false)
@@ -30,6 +32,34 @@ const ManagementHistoryModal = ({ keyword, onClose }) => {
   const handleCancelEntry = () => {
     setIsAdding(false)
     setNewEntry('')
+  }
+
+  const handleEditEntry = (history) => {
+    setEditingId(`${history.no}-${history.modifiedTime}`)
+    setEditContent(history.content)
+  }
+
+  const handleSaveEdit = (history) => {
+    if (editContent.trim() && editContent.length <= 100) {
+      // 실제 구현에서는 여기서 API 호출하여 서버에 수정사항 저장
+      console.log('관리 내역 수정:', { id: `${history.no}-${history.modifiedTime}`, content: editContent })
+      setEditingId(null)
+      setEditContent('')
+      // 실제로는 부모 컴포넌트의 데이터를 업데이트해야 함
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditContent('')
+  }
+
+  const handleDeleteEntry = (history) => {
+    if (window.confirm('이 관리 내역을 삭제하시겠습니까?')) {
+      // 실제 구현에서는 여기서 API 호출하여 서버에서 삭제
+      console.log('관리 내역 삭제:', { id: `${history.no}-${history.modifiedTime}` })
+      // 실제로는 부모 컴포넌트의 데이터를 업데이트해야 함
+    }
   }
 
   const sortedHistory = [...(keyword.managementHistory || [])]
@@ -86,8 +116,9 @@ const ManagementHistoryModal = ({ keyword, onClose }) => {
                 <thead>
                   <tr>
                     <th>NO</th>
-                    <th>내용</th>
+                    <th>내용 (100자 이내)</th>
                     <th>수정 시간</th>
+                    <th>관리</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -99,17 +130,24 @@ const ManagementHistoryModal = ({ keyword, onClose }) => {
                           <input
                             type="text"
                             value={newEntry}
-                            onChange={(e) => setNewEntry(e.target.value)}
+                            onChange={(e) => {
+                              if (e.target.value.length <= 100) {
+                                setNewEntry(e.target.value)
+                              }
+                            }}
                             placeholder="관리 내역을 입력하세요"
                             className={styles.entryInput}
                             autoFocus
                           />
                           <div className={styles.inputActions}>
+                            <div className={styles.charCount}>
+                              {newEntry.length}/100
+                            </div>
                             <button 
                               type="button" 
                               className="btn btn-info btn-xs"
                               onClick={handleSaveEntry}
-                              disabled={!newEntry.trim()}
+                              disabled={!newEntry.trim() || newEntry.length > 100}
                             >
                               저장
                             </button>
@@ -124,13 +162,76 @@ const ManagementHistoryModal = ({ keyword, onClose }) => {
                         </div>
                       </td>
                       <td>{formatDateTime(new Date())}</td>
+                      <td>-</td>
                     </tr>
                   )}
                   {sortedHistory.map((history) => (
                     <tr key={`${history.no}-${history.modifiedTime}`}>
                       <td>{history.no}</td>
-                      <td>{history.content}</td>
+                      <td>
+                        {editingId === `${history.no}-${history.modifiedTime}` ? (
+                          <div className={styles.inputContainer}>
+                            <input
+                              type="text"
+                              value={editContent}
+                              onChange={(e) => {
+                              if (e.target.value.length <= 100) {
+                                setEditContent(e.target.value)
+                              }
+                            }}
+                              className={styles.entryInput}
+                              autoFocus
+                            />
+                            <div className={styles.inputActions}>
+                              <div className={styles.charCount}>
+                                {editContent.length}/100
+                              </div>
+                              <button 
+                                type="button" 
+                                className="btn btn-info btn-xs"
+                                onClick={() => handleSaveEdit(history)}
+                                disabled={!editContent.trim() || editContent.length > 100}
+                              >
+                                저장
+                              </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary btn-xs"
+                                onClick={handleCancelEdit}
+                              >
+                                취소
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          history.content
+                        )}
+                      </td>
                       <td>{formatDateTime(history.modifiedTime)}</td>
+                      <td>
+                        {editingId === `${history.no}-${history.modifiedTime}` ? (
+                          <span>편집 중</span>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-info btn-xs"
+                              onClick={() => handleEditEntry(history)}
+                              title="수정"
+                            >
+                              수정
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-xs"
+                              onClick={() => handleDeleteEntry(history)}
+                              title="삭제"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -17,7 +17,7 @@ export default function Layout({ children, currentPage, setCurrentPage }) {
               {currentPage === 'dashboard' && '대시보드'}
               {currentPage === 'daily-data' && '일자별 데이터'}
               {currentPage === 'keyword-data' && '키워드별 데이터'}
-              {currentPage === 'keyword-management' && '키워드 관리'}
+              {currentPage === 'keyword-management' && '광고주 관리'}
               {currentPage === 'naver' && '네이버 광고'}
               {currentPage === 'kakao' && '카카오 광고'}
               {currentPage === 'google' && '구글 광고'}

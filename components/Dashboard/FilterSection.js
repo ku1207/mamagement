@@ -225,7 +225,7 @@ const FilterSection = ({
               onClick={onApplyFilters}
               className="filter-button"
               style={{ 
-                background: '#28a745',
+                background: '#667eea',
                 position: 'absolute',
                 bottom: '10px',
                 right: '10px'
