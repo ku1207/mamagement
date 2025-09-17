@@ -1,0 +1,284 @@
+/* 데이터 테이블 스타일 */
+.tableHeader {
+  background: #e9ecef;
+}
+
+.tableHeaderSecondary {
+  background: #f8f9fa;
+}
+
+.headerCell {
+  padding: 12px;
+  text-align: center;
+  border-bottom: 1px solid #dee2e6;
+  border-right: 1px solid #dee2e6;
+  font-size: 0.9rem;
+  font-weight: 600;
+  vertical-align: middle;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.headerCellSecondary {
+  padding: 8px;
+  text-align: center;
+  border-bottom: 1px solid #dee2e6;
+  border-right: 1px solid #dee2e6;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+/* 데이터 그룹별 배경색 */
+.costDataGroup {
+  background: #d5f4e6;
+}
+
+.cpcDataGroup {
+  background: #d4e6f1;
+}
+
+.conversionDataGroup {
+  background: #e8f5e8;
+}
+
+.cpaDataGroup {
+  background: #fff3cd;
+}
+
+.otherDataGroup {
+  background: #f8f9fa;
+}
+
+/* 세부 컬럼 배경색 */
+.costDataCell {
+  background: #f0f9ff;
+}
+
+.cpcDataCell {
+  background: #f1f5f9;
+}
+
+.conversionDataCell {
+  background: #f0fff0;
+}
+
+.cpaDataCell {
+  background: #fffbf0;
+}
+
+/* 확장된 행의 데이터 셀은 기본 셀과 동일한 색상 사용 */
+
+.highlightCell {
+  background: #fff8e1;
+}
+
+/* 테이블 바디 */
+.tableRow {
+  cursor: pointer;
+}
+
+.tableRowEven {
+  background: #ffffff;
+  border-left: 3px solid #667eea;
+}
+
+.tableRowOdd {
+  background: #f8f9fa;
+  border-left: 3px solid #28a745;
+}
+
+.expandedRow {
+  background: #e7f3ff;
+  border-left: 3px solid #667eea;
+  border-top: 1px solid #b3d9ff;
+  border-bottom: 1px solid #b3d9ff;
+  animation: slideDown 0.3s ease-out;
+  transition: background-color 0.2s ease;
+}
+
+.expandedRow:hover {
+  background: #d1ecff;
+}
+
+.tableCell {
+  padding: 10px;
+  border-bottom: 1px solid #dee2e6;
+  border-right: 1px solid #dee2e6;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 80px;
+}
+
+.tableCellLeft {
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.tableCellRight {
+  text-align: right;
+}
+
+.expandedCell {
+  padding: 8px 10px;
+  border-bottom: 1px solid #b3d9ff;
+  border-right: 1px solid #b3d9ff;
+  text-align: center;
+  color: #495057;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 80px;
+}
+
+.expandedIndent {
+  color: #667eea;
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+.expandedCellLeft {
+  text-align: center;
+  color: #6c757d;
+  font-weight: 500;
+  padding-left: 20px;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.expandedCellRight {
+  text-align: right;
+  color: #495057;
+}
+
+/* 기간별 합산 테이블 */
+.periodTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.periodTableHeader {
+  background: #e9ecef;
+}
+
+.periodTableHeaderCell {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.periodTableHeaderCellCenter {
+  text-align: center;
+}
+
+.periodTableCell {
+  padding: 8px 10px;
+  border-bottom: 1px solid #dee2e6;
+  text-align: center;
+}
+
+.periodTableCellLeft {
+  text-align: left;
+  font-weight: 600;
+}
+
+.changeRatePositive {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.changeRateNegative {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.changeRateNeutral {
+  color: #6c757d;
+}
+
+/* 컬럼별 특정 너비 설정 */
+.keywordColumn {
+  width: 140px !important;
+  min-width: 140px !important;
+  max-width: 140px !important;
+}
+
+.mediaColumn {
+  width: 84px !important;
+  min-width: 84px !important;
+  max-width: 84px !important;
+}
+
+.campaignColumn {
+  width: 175px !important;
+  min-width: 175px !important;
+  max-width: 175px !important;
+}
+
+.adGroupColumn {
+  width: 175px !important;
+  min-width: 175px !important;
+  max-width: 175px !important;
+}
+
+.dataColumn {
+  width: 98px !important;
+  min-width: 98px !important;
+  max-width: 98px !important;
+}
+
+.ctrColumn {
+  width: 70px !important;
+  min-width: 70px !important;
+  max-width: 70px !important;
+}
+
+/* 행 확장/축소 스타일 */
+.keywordWithExpander {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expandIcon {
+  color: #000000;
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+  min-width: 12px;
+}
+
+.expandIcon.expanded {
+  transform: rotate(0deg);
+}
+
+.expandedMainRow {
+  background: #e3f2fd !important;
+  border-left: 3px solid #2196f3 !important;
+}
+
+.expandedMainRow:hover {
+  background: #e1f5fe !important;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    max-height: 0;
+    box-shadow: none;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 60px;
+    box-shadow: inset 0 2px 4px rgba(76, 175, 80, 0.1);
+  }
+}
+

@@ -1,0 +1,429 @@
+/* 키워드 데이터 페이지 메인 스타일 */
+.contentArea {
+  padding: 0;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.emptyStateContent {
+  text-align: center;
+}
+
+.emptyStateIcon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.emptyStateTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.emptyStateDescription {
+  color: #6c757d;
+}
+
+/* 필터 섹션 */
+.filterSection {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filterContainer {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+.filterGroup {
+  flex: 1;
+}
+
+.filterGroupLarge {
+  flex: 2;
+}
+
+.filterGroupFixed {
+  min-width: 160px;
+}
+
+.filterLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.mediaCheckboxContainer {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.checkboxInput {
+  margin-right: 6px;
+}
+
+.dateInput {
+  padding: 6px 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  width: 140px;
+}
+
+/* 키워드 필터링 섹션 */
+.keywordFiltering {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filterControls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlLabel {
+  font-size: 0.9rem;
+  color: #6c757d;
+  min-width: 30px;
+}
+
+.selectInput, .numberInput {
+  padding: 6px 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  width: 100px;
+  height: 34px;
+  box-sizing: border-box;
+}
+
+.searchButton {
+  padding: 6px 16px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 0.2s;
+  height: 34px;
+}
+
+.searchButton:hover {
+  background: #218838;
+}
+
+/* 광고비 범위 필터 */
+.costRangeFilter {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.costRangeLabel {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.costRangeText {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+/* 기간별 합산 데이터 섹션 */
+.periodSummarySection {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.periodSummaryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.periodSummaryTitle {
+  margin: 0;
+  color: #495057;
+}
+
+.searchConditions {
+  background: #fff3cd;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #ffeaa7;
+  font-size: 0.85rem;
+  color: #856404;
+}
+
+.searchConditionsLabel {
+  margin-left: 8px;
+}
+
+/* 키워드 상세 데이터 섹션 */
+.keywordDetailSection {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.keywordDetailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.keywordDetailTitle {
+  margin: 0;
+  color: #495057;
+}
+
+.keywordDetailHint {
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* 데이터 선택 섹션 */
+.dataSelector {
+  margin-bottom: 20px;
+}
+
+.dataSelectorContainer {
+  display: flex;
+  align-items: flex-start;
+  gap: 40px;
+}
+
+.dataSelectorSection {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  padding: 15px;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.kpiSection {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.dataSelectorLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #495057;
+  margin-right: 10px;
+}
+
+/* 테이블 공통 스타일 */
+.tableWrapper {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+
+.scrollHint {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #495057;
+  margin-bottom: 10px;
+  padding: 10px 20px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.tableContainer {
+  background: white;
+  border-radius: 0;
+  overflow: visible;
+  border: none;
+  width: 100%;
+}
+
+.table {
+  width: 2500px;
+  min-width: 2500px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+  table-layout: fixed;
+}
+
+.tableScrollContainer {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: scroll !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thick;
+  scrollbar-color: #6c757d #f8f9fa;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  min-height: 400px;
+}
+
+/* 웹킷 기반 브라우저 스크롤바 - 강제 표시 */
+.tableScrollContainer::-webkit-scrollbar {
+  height: 24px !important;
+  width: 24px !important;
+  -webkit-appearance: none;
+  display: block !important;
+  visibility: visible !important;
+}
+
+.tableScrollContainer::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  box-shadow: inset 0 0 3px rgba(0,0,0,0.1);
+}
+
+.tableScrollContainer::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, #6c757d 0%, #495057 50%, #343a40 100%);
+  border: 1px solid #adb5bd;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  min-width: 80px !important;
+  min-height: 24px !important;
+}
+
+.tableScrollContainer::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, #495057 0%, #343a40 50%, #212529 100%);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.tableScrollContainer::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(45deg, #343a40 0%, #212529 50%, #000000 100%);
+}
+
+.tableScrollContainer::-webkit-scrollbar-corner {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+}
+
+/* 스크롤바 강제 표시 */
+.tableScrollContainer {
+  scrollbar-gutter: stable;
+  position: relative;
+  display: block;
+}
+
+.tableScrollContainer::-webkit-scrollbar {
+  -webkit-appearance: none;
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* 모바일 환경에서 스크롤 개선 */
+@media (max-width: 768px) {
+  .tableScrollContainer {
+    padding-bottom: 25px;
+    margin-bottom: 20px;
+  }
+  
+  .tableScrollContainer::-webkit-scrollbar {
+    height: 24px !important;
+    display: block !important;
+  }
+  
+  .tableScrollContainer::-webkit-scrollbar-thumb {
+    background: linear-gradient(45deg, #007bff, #0056b3) !important;
+    border-radius: 12px;
+    border: 2px solid #f8f9fa;
+    min-width: 60px;
+  }
+  
+  .scrollHint {
+    font-size: 0.9rem;
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-weight: 500;
+  }
+}
+
+/* 태블릿 환경 */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .tableScrollContainer::-webkit-scrollbar {
+    height: 22px !important;
+    display: block !important;
+  }
+}
+
+.emptyData {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+}
+
+/* 애니메이션 */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
