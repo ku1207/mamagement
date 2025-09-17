@@ -216,6 +216,13 @@
   max-width: 84px !important;
 }
 
+.managementColumn {
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  text-align: center !important;
+}
+
 .campaignColumn {
   width: 175px !important;
   min-width: 175px !important;

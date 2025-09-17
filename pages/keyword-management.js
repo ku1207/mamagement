@@ -1,105 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import KeywordResultTable from '../components/KeywordManagement/KeywordResultTable.js'
+import KpiManagement from '../components/KpiManagement/KpiManagement.js'
 import styles from '../styles/components/KeywordManagement.module.css'
 
-// KPI 관리 탭 컴포넌트
-function KpiManagement() {
-  const [selectedMedia, setSelectedMedia] = useState('네이버')
-  const [kpiData, setKpiData] = useState({
-    '네이버': { metrics: {} },
-    '카카오': { metrics: {} },
-    '구글': { metrics: {} },
-    '메타': { metrics: {} },
-    '틱톡': { metrics: {} }
-  })
-
-  const mediaOptions = ['네이버', '카카오', '구글', '메타', '틱톡']
-
-  // 키워드별 데이터 페이지에서 사용 가능한 지표들
-  const availableMetrics = [
-    { id: 'cost', label: '광고비', unit: '원', description: '총 광고 비용' },
-    { id: 'cpc', label: 'CPC', unit: '원', description: '클릭당 비용' },
-    { id: 'conversion', label: '전환수', unit: '개', description: '전환 횟수' },
-    { id: 'cpa', label: 'CPA', unit: '원', description: '전환당 비용' },
-    { id: 'ctr', label: 'CTR', unit: '%', description: '클릭률' },
-    { id: 'impressions', label: '노출수', unit: '회', description: '광고 노출 횟수' },
-    { id: 'clicks', label: '클릭수', unit: '회', description: '광고 클릭 횟수' }
-  ]
-
-  const handleKpiChange = (field, value) => {
-    setKpiData(prev => ({
-      ...prev,
-      [selectedMedia]: {
-        ...prev[selectedMedia],
-        metrics: {
-          ...prev[selectedMedia].metrics,
-          [field]: value
-        }
-      }
-    }))
-  }
-
-  const handleSaveKpi = () => {
-    console.log('KPI 저장:', { selectedMedia, kpiData: kpiData[selectedMedia] })
-    // 실제 구현에서는 여기서 API 호출
-    alert(`${selectedMedia} KPI가 저장되었습니다.`)
-  }
-
-  const currentKpi = kpiData[selectedMedia]
-
-  return (
-    <div className="kpi-management-content">
-      {/* 매체별 KPI 목표 설정 섹션 */}
-      <div className="kpi-section">
-        <div className="kpi-header">
-          <h3>매체별 KPI 목표 설정</h3>
-          <div className="media-selector">
-            <label htmlFor="kpi-media-select">매체 선택:</label>
-            <select 
-              id="kpi-media-select"
-              value={selectedMedia}
-              onChange={(e) => setSelectedMedia(e.target.value)}
-              className="kpi-media-select"
-            >
-              {mediaOptions.map(media => (
-                <option key={media} value={media}>{media}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="kpi-form">
-          <div className="kpi-grid">
-            {availableMetrics.map(metric => (
-              <div key={metric.id} className="kpi-item">
-                <label className="kpi-label">
-                  월 목표 {metric.label} {metric.unit && `(${metric.unit})`}
-                </label>
-                <input 
-                  type="number" 
-                  step={metric.id === 'ctr' ? '0.01' : '1'}
-                  placeholder={`목표 ${metric.label}을 입력하세요`}
-                  value={currentKpi.metrics[metric.id] || ''}
-                  onChange={(e) => handleKpiChange(metric.id, e.target.value)}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="kpi-actions">
-            <button 
-              className="btn btn-primary btn-md"
-              onClick={handleSaveKpi}
-            >
-              {selectedMedia} KPI 저장
-            </button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  )
+// KPI 관리 탭 컴포넌트 (재사용 가능한 컴포넌트 사용)
+function KpiManagementTab() {
+  return <KpiManagement />
 }
 
 // 키워드 관리 탭 컴포넌트
@@ -278,7 +185,7 @@ export default function AdvertiserManagementContent() {
 
       {/* 탭 콘텐츠 */}
       <div className="tab-content">
-        {activeTab === 'kpi' && <KpiManagement />}
+        {activeTab === 'kpi' && <KpiManagementTab />}
         {activeTab === 'keyword' && <KeywordManagement />}
       </div>
     </div>

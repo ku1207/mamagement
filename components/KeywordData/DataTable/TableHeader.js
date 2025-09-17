@@ -16,6 +16,7 @@ const TableHeader = ({
       <tr className={tableStyles.tableHeader}>
         <th rowSpan={2} className={`${tableStyles.headerCell} ${tableStyles.mediaColumn}`}>매체</th>
         <th rowSpan={2} className={`${tableStyles.headerCell} ${tableStyles.keywordColumn}`}>키워드</th>
+        <th rowSpan={2} className={`${tableStyles.headerCell} ${tableStyles.managementColumn}`}>관리</th>
         
         {/* 광고비 데이터 그룹 */}
         {showCostData && (

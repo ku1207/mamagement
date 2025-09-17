@@ -73,22 +73,6 @@ const DataSelector = ({
             기타
           </label>
         </div>
-        
-        <div className={styles.kpiSection}>
-          <label className={styles.dataSelectorLabel}>
-            KPI:
-          </label>
-          <span 
-            className={styles.kpiPlaceholder}
-            style={{ 
-              fontSize: '0.85em', 
-              fontStyle: 'italic', 
-              color: '#6c757d' 
-            }}
-          >
-            관리자 기능에서 설정해 주세요.
-          </span>
-        </div>
       </div>
     </div>
   )

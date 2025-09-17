@@ -20,6 +20,9 @@ const ExpandedRow = ({
       <td className={`${tableStyles.expandedCell} ${tableStyles.keywordColumn}`}>
         {mediaItem.keyword}
       </td>
+      <td className={`${tableStyles.expandedCell} ${tableStyles.managementColumn}`}>
+        {/* 확장된 행에는 관리 버튼 표시하지 않음 */}
+      </td>
       
       {/* 광고비 데이터 */}
       {showCostData && (

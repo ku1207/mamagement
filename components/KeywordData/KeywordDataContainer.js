@@ -1,6 +1,6 @@
 // 키워드 데이터 메인 컨테이너 컴포넌트
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext.js'
 import useKeywordData from '../../hooks/useKeywordData.js'
 import useFilters from '../../hooks/useFilters.js'
@@ -9,6 +9,7 @@ import FilterSection from './FilterSection.js'
 import PeriodSummary from './PeriodSummary.js'
 import DataSelector from './DataSelector.js'
 import DataTable from './DataTable/index.js'
+import KpiViewModal from '../KpiManagement/KpiViewModal.js'
 
 const KeywordDataContainer = () => {
   const { selectedAdvertiser } = useAuth()
@@ -48,6 +49,13 @@ const KeywordDataContainer = () => {
   const [showConversionData, setShowConversionData] = useState(false)
   const [showCpaData, setShowCpaData] = useState(false)
   const [showOtherData, setShowOtherData] = useState(true)
+
+  // KPI 모달 상태 관리
+  const [showKpiModal, setShowKpiModal] = useState(false)
+  
+  // 디버깅을 위한 상태 로그
+  console.log('showKpiModal 상태:', showKpiModal)
+
 
   // 광고주가 선택되지 않은 경우
   if (!selectedAdvertiser) {
@@ -138,7 +146,19 @@ const KeywordDataContainer = () => {
         {/* 키워드(소재) 상세 데이터 */}
         <div className={styles.keywordDetailSection}>
           <div className={styles.keywordDetailHeader}>
-            <h3 className={styles.keywordDetailTitle}>금일 키워드 상세 데이터</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <h3 className={styles.keywordDetailTitle}>금일 키워드 상세 데이터</h3>
+              <button
+                type="button"
+                className="btn btn-info btn-sm"
+                onClick={() => {
+                  console.log('KPI 확인 버튼 클릭됨')
+                  setShowKpiModal(true)
+                }}
+              >
+                KPI 확인
+              </button>
+            </div>
             <span className={styles.keywordDetailHint}>
               각 매체별 키워드 데이터를 표시합니다.
             </span>
@@ -169,6 +189,16 @@ const KeywordDataContainer = () => {
           />
         </div>
       </div>
+
+      {/* KPI 확인 모달 */}
+      {showKpiModal && (
+        <KpiViewModal
+          onClose={() => {
+            console.log('KPI 모달 닫기')
+            setShowKpiModal(false)
+          }}
+        />
+      )}
     </div>
   )
 }
