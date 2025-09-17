@@ -20,7 +20,7 @@ export default function Navigation({ currentPage, setCurrentPage }) {
         { id: 'dashboard', label: '대시보드' },
         { id: 'daily-data', label: '일자별 데이터' },
         { id: 'keyword-data', label: '키워드별 데이터' },
-        { id: 'keyword-management', label: '키워드 관리' }
+        { id: 'keyword-management', label: '광고주 관리' }
       ]
     }
   }

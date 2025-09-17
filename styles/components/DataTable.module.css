@@ -86,7 +86,7 @@
 
 .tableRowOdd {
   background: #f8f9fa;
-  border-left: 3px solid #28a745;
+  border-left: 3px solid #667eea;
 }
 
 .expandedRow {
@@ -190,7 +190,7 @@
 }
 
 .changeRatePositive {
-  color: #28a745;
+  color: #667eea;
   font-weight: 600;
 }
 

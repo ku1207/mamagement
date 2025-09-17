@@ -79,29 +79,40 @@ const KeywordResultTable = ({ keywords = [] }) => {
               <th>캠페인</th>
               <th>그룹</th>
               <th>키워드(소재)</th>
+              <th>내용</th>
               <th>최근 수정 시간</th>
               <th>관리 내역</th>
             </tr>
           </thead>
           <tbody>
-            {currentItems.map((keyword) => (
-              <tr key={keyword.id}>
-                <td>{keyword.media}</td>
-                <td>{keyword.campaign}</td>
-                <td>{keyword.group}</td>
-                <td>{keyword.keyword}</td>
-                <td>{formatDateTime(keyword.lastModified)}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn-info btn-sm"
-                    onClick={() => handleViewHistory(keyword)}
-                  >
-                    확인
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {currentItems.map((keyword) => {
+              // 가장 최신 관리 내역 찾기
+              const latestHistory = keyword.managementHistory && keyword.managementHistory.length > 0
+                ? keyword.managementHistory.reduce((latest, history) => 
+                    new Date(history.modifiedTime) > new Date(latest.modifiedTime) ? history : latest
+                  )
+                : null;
+              
+              return (
+                <tr key={keyword.id}>
+                  <td>{keyword.media}</td>
+                  <td>{keyword.campaign}</td>
+                  <td>{keyword.group}</td>
+                  <td>{keyword.keyword}</td>
+                  <td>{latestHistory ? latestHistory.content : '-'}</td>
+                  <td>{formatDateTime(keyword.lastModified)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-info btn-sm"
+                      onClick={() => handleViewHistory(keyword)}
+                    >
+                      확인
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -320,7 +320,7 @@ const TableRow = ({
                                 </button>
                                 <button 
                                   type="button" 
-                                  className="btn btn-secondary btn-xs"
+                                  className="btn btn-danger btn-xs"
                                   onClick={handleCancelEntry}
                                 >
                                   취소
